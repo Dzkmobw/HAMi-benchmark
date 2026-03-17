@@ -1,0 +1,584 @@
+{
+  "apiVersion": "v1",
+  "items": [
+    {
+      "apiVersion": "batch/v1",
+      "kind": "Job",
+      "metadata": {
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"batch/v1\",\"kind\":\"Job\",\"metadata\":{\"annotations\":{},\"labels\":{\"benchmark.hami.io/mode\":\"hami-only\",\"benchmark.hami.io/plan\":\"mini\",\"benchmark.hami.io/workload\":\"background-training\"},\"name\":\"mini-background-training\",\"namespace\":\"hami-benchmark-mini\"},\"spec\":{\"backoffLimit\":0,\"template\":{\"metadata\":{\"labels\":{\"benchmark.hami.io/mode\":\"hami-only\",\"benchmark.hami.io/plan\":\"mini\",\"benchmark.hami.io/workload\":\"background-training\"}},\"spec\":{\"containers\":[{\"command\":[\"python\",\"/workloads/mini_workload.py\"],\"env\":[{\"name\":\"WORKLOAD_KIND\",\"value\":\"background-training\"},{\"name\":\"WORKLOAD_RUNTIME_SECONDS\",\"value\":\"180\"},{\"name\":\"WORKLOAD_RESERVE_MIB\",\"value\":\"2200\"},{\"name\":\"WORKLOAD_BATCH_SIZE\",\"value\":\"64\"}],\"image\":\"pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime\",\"imagePullPolicy\":\"IfNotPresent\",\"name\":\"worker\",\"resources\":{\"limits\":{\"nvidia.com/gpu\":\"1\",\"nvidia.com/gpucores\":\"40\",\"nvidia.com/gpumem\":\"3000\"}},\"volumeMounts\":[{\"mountPath\":\"/workloads\",\"name\":\"workloads\"}]}],\"restartPolicy\":\"Never\",\"volumes\":[{\"configMap\":{\"name\":\"hami-benchmark-mini-workloads\"},\"name\":\"workloads\"}]}},\"ttlSecondsAfterFinished\":3600}}\n"
+        },
+        "creationTimestamp": "2026-03-17T09:34:43Z",
+        "generation": 1,
+        "labels": {
+          "benchmark.hami.io/mode": "hami-only",
+          "benchmark.hami.io/plan": "mini",
+          "benchmark.hami.io/workload": "background-training"
+        },
+        "name": "mini-background-training",
+        "namespace": "hami-benchmark-mini",
+        "resourceVersion": "57215",
+        "uid": "a18be460-0639-442e-851b-02c2dfe107a2"
+      },
+      "spec": {
+        "backoffLimit": 0,
+        "completionMode": "NonIndexed",
+        "completions": 1,
+        "manualSelector": false,
+        "parallelism": 1,
+        "podReplacementPolicy": "TerminatingOrFailed",
+        "selector": {
+          "matchLabels": {
+            "batch.kubernetes.io/controller-uid": "a18be460-0639-442e-851b-02c2dfe107a2"
+          }
+        },
+        "suspend": false,
+        "template": {
+          "metadata": {
+            "labels": {
+              "batch.kubernetes.io/controller-uid": "a18be460-0639-442e-851b-02c2dfe107a2",
+              "batch.kubernetes.io/job-name": "mini-background-training",
+              "benchmark.hami.io/mode": "hami-only",
+              "benchmark.hami.io/plan": "mini",
+              "benchmark.hami.io/workload": "background-training",
+              "controller-uid": "a18be460-0639-442e-851b-02c2dfe107a2",
+              "job-name": "mini-background-training"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "command": [
+                  "python",
+                  "/workloads/mini_workload.py"
+                ],
+                "env": [
+                  {
+                    "name": "WORKLOAD_KIND",
+                    "value": "background-training"
+                  },
+                  {
+                    "name": "WORKLOAD_RUNTIME_SECONDS",
+                    "value": "180"
+                  },
+                  {
+                    "name": "WORKLOAD_RESERVE_MIB",
+                    "value": "2200"
+                  },
+                  {
+                    "name": "WORKLOAD_BATCH_SIZE",
+                    "value": "64"
+                  }
+                ],
+                "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "worker",
+                "resources": {
+                  "limits": {
+                    "nvidia.com/gpu": "1",
+                    "nvidia.com/gpucores": "40",
+                    "nvidia.com/gpumem": "3k"
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/workloads",
+                    "name": "workloads"
+                  }
+                ]
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "restartPolicy": "Never",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "terminationGracePeriodSeconds": 30,
+            "volumes": [
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "hami-benchmark-mini-workloads"
+                },
+                "name": "workloads"
+              }
+            ]
+          }
+        },
+        "ttlSecondsAfterFinished": 3600
+      },
+      "status": {
+        "active": 1,
+        "ready": 0,
+        "startTime": "2026-03-17T09:34:43Z",
+        "terminating": 0,
+        "uncountedTerminatedPods": {}
+      }
+    },
+    {
+      "apiVersion": "batch/v1",
+      "kind": "Job",
+      "metadata": {
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"batch/v1\",\"kind\":\"Job\",\"metadata\":{\"annotations\":{},\"labels\":{\"benchmark.hami.io/mode\":\"hami-only\",\"benchmark.hami.io/plan\":\"mini\",\"benchmark.hami.io/workload\":\"medium-inference\"},\"name\":\"mini-medium-inference-1\",\"namespace\":\"hami-benchmark-mini\"},\"spec\":{\"backoffLimit\":0,\"template\":{\"metadata\":{\"labels\":{\"benchmark.hami.io/mode\":\"hami-only\",\"benchmark.hami.io/plan\":\"mini\",\"benchmark.hami.io/workload\":\"medium-inference\"}},\"spec\":{\"containers\":[{\"command\":[\"python\",\"/workloads/mini_workload.py\"],\"env\":[{\"name\":\"WORKLOAD_KIND\",\"value\":\"medium-inference\"},{\"name\":\"WORKLOAD_RUNTIME_SECONDS\",\"value\":\"60\"},{\"name\":\"WORKLOAD_RESERVE_MIB\",\"value\":\"1200\"},{\"name\":\"WORKLOAD_BATCH_SIZE\",\"value\":\"8\"}],\"image\":\"pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime\",\"imagePullPolicy\":\"IfNotPresent\",\"name\":\"worker\",\"resources\":{\"limits\":{\"nvidia.com/gpu\":\"1\",\"nvidia.com/gpucores\":\"30\",\"nvidia.com/gpumem\":\"1800\"}},\"volumeMounts\":[{\"mountPath\":\"/workloads\",\"name\":\"workloads\"}]}],\"restartPolicy\":\"Never\",\"volumes\":[{\"configMap\":{\"name\":\"hami-benchmark-mini-workloads\"},\"name\":\"workloads\"}]}},\"ttlSecondsAfterFinished\":3600}}\n"
+        },
+        "creationTimestamp": "2026-03-17T09:34:46Z",
+        "generation": 1,
+        "labels": {
+          "benchmark.hami.io/mode": "hami-only",
+          "benchmark.hami.io/plan": "mini",
+          "benchmark.hami.io/workload": "medium-inference"
+        },
+        "name": "mini-medium-inference-1",
+        "namespace": "hami-benchmark-mini",
+        "resourceVersion": "57233",
+        "uid": "bd04199e-0ca8-4dfa-84e5-51c777af8017"
+      },
+      "spec": {
+        "backoffLimit": 0,
+        "completionMode": "NonIndexed",
+        "completions": 1,
+        "manualSelector": false,
+        "parallelism": 1,
+        "podReplacementPolicy": "TerminatingOrFailed",
+        "selector": {
+          "matchLabels": {
+            "batch.kubernetes.io/controller-uid": "bd04199e-0ca8-4dfa-84e5-51c777af8017"
+          }
+        },
+        "suspend": false,
+        "template": {
+          "metadata": {
+            "labels": {
+              "batch.kubernetes.io/controller-uid": "bd04199e-0ca8-4dfa-84e5-51c777af8017",
+              "batch.kubernetes.io/job-name": "mini-medium-inference-1",
+              "benchmark.hami.io/mode": "hami-only",
+              "benchmark.hami.io/plan": "mini",
+              "benchmark.hami.io/workload": "medium-inference",
+              "controller-uid": "bd04199e-0ca8-4dfa-84e5-51c777af8017",
+              "job-name": "mini-medium-inference-1"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "command": [
+                  "python",
+                  "/workloads/mini_workload.py"
+                ],
+                "env": [
+                  {
+                    "name": "WORKLOAD_KIND",
+                    "value": "medium-inference"
+                  },
+                  {
+                    "name": "WORKLOAD_RUNTIME_SECONDS",
+                    "value": "60"
+                  },
+                  {
+                    "name": "WORKLOAD_RESERVE_MIB",
+                    "value": "1200"
+                  },
+                  {
+                    "name": "WORKLOAD_BATCH_SIZE",
+                    "value": "8"
+                  }
+                ],
+                "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "worker",
+                "resources": {
+                  "limits": {
+                    "nvidia.com/gpu": "1",
+                    "nvidia.com/gpucores": "30",
+                    "nvidia.com/gpumem": "1800"
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/workloads",
+                    "name": "workloads"
+                  }
+                ]
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "restartPolicy": "Never",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "terminationGracePeriodSeconds": 30,
+            "volumes": [
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "hami-benchmark-mini-workloads"
+                },
+                "name": "workloads"
+              }
+            ]
+          }
+        },
+        "ttlSecondsAfterFinished": 3600
+      },
+      "status": {
+        "active": 1,
+        "ready": 0,
+        "startTime": "2026-03-17T09:34:46Z",
+        "terminating": 0,
+        "uncountedTerminatedPods": {}
+      }
+    },
+    {
+      "apiVersion": "batch/v1",
+      "kind": "Job",
+      "metadata": {
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"batch/v1\",\"kind\":\"Job\",\"metadata\":{\"annotations\":{},\"labels\":{\"benchmark.hami.io/mode\":\"hami-only\",\"benchmark.hami.io/plan\":\"mini\",\"benchmark.hami.io/workload\":\"short-inference\"},\"name\":\"mini-short-inference-1\",\"namespace\":\"hami-benchmark-mini\"},\"spec\":{\"backoffLimit\":0,\"template\":{\"metadata\":{\"labels\":{\"benchmark.hami.io/mode\":\"hami-only\",\"benchmark.hami.io/plan\":\"mini\",\"benchmark.hami.io/workload\":\"short-inference\"}},\"spec\":{\"containers\":[{\"command\":[\"python\",\"/workloads/mini_workload.py\"],\"env\":[{\"name\":\"WORKLOAD_KIND\",\"value\":\"short-inference\"},{\"name\":\"WORKLOAD_RUNTIME_SECONDS\",\"value\":\"20\"},{\"name\":\"WORKLOAD_RESERVE_MIB\",\"value\":\"400\"},{\"name\":\"WORKLOAD_BATCH_SIZE\",\"value\":\"256\"}],\"image\":\"pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime\",\"imagePullPolicy\":\"IfNotPresent\",\"name\":\"worker\",\"resources\":{\"limits\":{\"nvidia.com/gpu\":\"1\",\"nvidia.com/gpucores\":\"20\",\"nvidia.com/gpumem\":\"800\"}},\"volumeMounts\":[{\"mountPath\":\"/workloads\",\"name\":\"workloads\"}]}],\"restartPolicy\":\"Never\",\"volumes\":[{\"configMap\":{\"name\":\"hami-benchmark-mini-workloads\"},\"name\":\"workloads\"}]}},\"ttlSecondsAfterFinished\":3600}}\n"
+        },
+        "creationTimestamp": "2026-03-17T09:34:49Z",
+        "generation": 1,
+        "labels": {
+          "benchmark.hami.io/mode": "hami-only",
+          "benchmark.hami.io/plan": "mini",
+          "benchmark.hami.io/workload": "short-inference"
+        },
+        "name": "mini-short-inference-1",
+        "namespace": "hami-benchmark-mini",
+        "resourceVersion": "57251",
+        "uid": "96a1892d-3cb6-44ae-b933-0e2448ad0ba1"
+      },
+      "spec": {
+        "backoffLimit": 0,
+        "completionMode": "NonIndexed",
+        "completions": 1,
+        "manualSelector": false,
+        "parallelism": 1,
+        "podReplacementPolicy": "TerminatingOrFailed",
+        "selector": {
+          "matchLabels": {
+            "batch.kubernetes.io/controller-uid": "96a1892d-3cb6-44ae-b933-0e2448ad0ba1"
+          }
+        },
+        "suspend": false,
+        "template": {
+          "metadata": {
+            "labels": {
+              "batch.kubernetes.io/controller-uid": "96a1892d-3cb6-44ae-b933-0e2448ad0ba1",
+              "batch.kubernetes.io/job-name": "mini-short-inference-1",
+              "benchmark.hami.io/mode": "hami-only",
+              "benchmark.hami.io/plan": "mini",
+              "benchmark.hami.io/workload": "short-inference",
+              "controller-uid": "96a1892d-3cb6-44ae-b933-0e2448ad0ba1",
+              "job-name": "mini-short-inference-1"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "command": [
+                  "python",
+                  "/workloads/mini_workload.py"
+                ],
+                "env": [
+                  {
+                    "name": "WORKLOAD_KIND",
+                    "value": "short-inference"
+                  },
+                  {
+                    "name": "WORKLOAD_RUNTIME_SECONDS",
+                    "value": "20"
+                  },
+                  {
+                    "name": "WORKLOAD_RESERVE_MIB",
+                    "value": "400"
+                  },
+                  {
+                    "name": "WORKLOAD_BATCH_SIZE",
+                    "value": "256"
+                  }
+                ],
+                "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "worker",
+                "resources": {
+                  "limits": {
+                    "nvidia.com/gpu": "1",
+                    "nvidia.com/gpucores": "20",
+                    "nvidia.com/gpumem": "800"
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/workloads",
+                    "name": "workloads"
+                  }
+                ]
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "restartPolicy": "Never",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "terminationGracePeriodSeconds": 30,
+            "volumes": [
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "hami-benchmark-mini-workloads"
+                },
+                "name": "workloads"
+              }
+            ]
+          }
+        },
+        "ttlSecondsAfterFinished": 3600
+      },
+      "status": {
+        "active": 1,
+        "ready": 0,
+        "startTime": "2026-03-17T09:34:49Z",
+        "terminating": 0,
+        "uncountedTerminatedPods": {}
+      }
+    },
+    {
+      "apiVersion": "batch/v1",
+      "kind": "Job",
+      "metadata": {
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"batch/v1\",\"kind\":\"Job\",\"metadata\":{\"annotations\":{},\"labels\":{\"benchmark.hami.io/mode\":\"hami-only\",\"benchmark.hami.io/plan\":\"mini\",\"benchmark.hami.io/workload\":\"short-inference\"},\"name\":\"mini-short-inference-2\",\"namespace\":\"hami-benchmark-mini\"},\"spec\":{\"backoffLimit\":0,\"template\":{\"metadata\":{\"labels\":{\"benchmark.hami.io/mode\":\"hami-only\",\"benchmark.hami.io/plan\":\"mini\",\"benchmark.hami.io/workload\":\"short-inference\"}},\"spec\":{\"containers\":[{\"command\":[\"python\",\"/workloads/mini_workload.py\"],\"env\":[{\"name\":\"WORKLOAD_KIND\",\"value\":\"short-inference\"},{\"name\":\"WORKLOAD_RUNTIME_SECONDS\",\"value\":\"20\"},{\"name\":\"WORKLOAD_RESERVE_MIB\",\"value\":\"400\"},{\"name\":\"WORKLOAD_BATCH_SIZE\",\"value\":\"256\"}],\"image\":\"pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime\",\"imagePullPolicy\":\"IfNotPresent\",\"name\":\"worker\",\"resources\":{\"limits\":{\"nvidia.com/gpu\":\"1\",\"nvidia.com/gpucores\":\"20\",\"nvidia.com/gpumem\":\"800\"}},\"volumeMounts\":[{\"mountPath\":\"/workloads\",\"name\":\"workloads\"}]}],\"restartPolicy\":\"Never\",\"volumes\":[{\"configMap\":{\"name\":\"hami-benchmark-mini-workloads\"},\"name\":\"workloads\"}]}},\"ttlSecondsAfterFinished\":3600}}\n"
+        },
+        "creationTimestamp": "2026-03-17T09:34:52Z",
+        "generation": 1,
+        "labels": {
+          "benchmark.hami.io/mode": "hami-only",
+          "benchmark.hami.io/plan": "mini",
+          "benchmark.hami.io/workload": "short-inference"
+        },
+        "name": "mini-short-inference-2",
+        "namespace": "hami-benchmark-mini",
+        "resourceVersion": "57270",
+        "uid": "41479e20-cd65-4f8a-bf67-7443ab5275fd"
+      },
+      "spec": {
+        "backoffLimit": 0,
+        "completionMode": "NonIndexed",
+        "completions": 1,
+        "manualSelector": false,
+        "parallelism": 1,
+        "podReplacementPolicy": "TerminatingOrFailed",
+        "selector": {
+          "matchLabels": {
+            "batch.kubernetes.io/controller-uid": "41479e20-cd65-4f8a-bf67-7443ab5275fd"
+          }
+        },
+        "suspend": false,
+        "template": {
+          "metadata": {
+            "labels": {
+              "batch.kubernetes.io/controller-uid": "41479e20-cd65-4f8a-bf67-7443ab5275fd",
+              "batch.kubernetes.io/job-name": "mini-short-inference-2",
+              "benchmark.hami.io/mode": "hami-only",
+              "benchmark.hami.io/plan": "mini",
+              "benchmark.hami.io/workload": "short-inference",
+              "controller-uid": "41479e20-cd65-4f8a-bf67-7443ab5275fd",
+              "job-name": "mini-short-inference-2"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "command": [
+                  "python",
+                  "/workloads/mini_workload.py"
+                ],
+                "env": [
+                  {
+                    "name": "WORKLOAD_KIND",
+                    "value": "short-inference"
+                  },
+                  {
+                    "name": "WORKLOAD_RUNTIME_SECONDS",
+                    "value": "20"
+                  },
+                  {
+                    "name": "WORKLOAD_RESERVE_MIB",
+                    "value": "400"
+                  },
+                  {
+                    "name": "WORKLOAD_BATCH_SIZE",
+                    "value": "256"
+                  }
+                ],
+                "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "worker",
+                "resources": {
+                  "limits": {
+                    "nvidia.com/gpu": "1",
+                    "nvidia.com/gpucores": "20",
+                    "nvidia.com/gpumem": "800"
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/workloads",
+                    "name": "workloads"
+                  }
+                ]
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "restartPolicy": "Never",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "terminationGracePeriodSeconds": 30,
+            "volumes": [
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "hami-benchmark-mini-workloads"
+                },
+                "name": "workloads"
+              }
+            ]
+          }
+        },
+        "ttlSecondsAfterFinished": 3600
+      },
+      "status": {
+        "active": 1,
+        "ready": 0,
+        "startTime": "2026-03-17T09:34:52Z",
+        "terminating": 0,
+        "uncountedTerminatedPods": {}
+      }
+    },
+    {
+      "apiVersion": "batch/v1",
+      "kind": "Job",
+      "metadata": {
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"batch/v1\",\"kind\":\"Job\",\"metadata\":{\"annotations\":{},\"labels\":{\"benchmark.hami.io/mode\":\"hami-only\",\"benchmark.hami.io/plan\":\"mini\",\"benchmark.hami.io/workload\":\"short-inference\"},\"name\":\"mini-short-inference-3\",\"namespace\":\"hami-benchmark-mini\"},\"spec\":{\"backoffLimit\":0,\"template\":{\"metadata\":{\"labels\":{\"benchmark.hami.io/mode\":\"hami-only\",\"benchmark.hami.io/plan\":\"mini\",\"benchmark.hami.io/workload\":\"short-inference\"}},\"spec\":{\"containers\":[{\"command\":[\"python\",\"/workloads/mini_workload.py\"],\"env\":[{\"name\":\"WORKLOAD_KIND\",\"value\":\"short-inference\"},{\"name\":\"WORKLOAD_RUNTIME_SECONDS\",\"value\":\"20\"},{\"name\":\"WORKLOAD_RESERVE_MIB\",\"value\":\"400\"},{\"name\":\"WORKLOAD_BATCH_SIZE\",\"value\":\"256\"}],\"image\":\"pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime\",\"imagePullPolicy\":\"IfNotPresent\",\"name\":\"worker\",\"resources\":{\"limits\":{\"nvidia.com/gpu\":\"1\",\"nvidia.com/gpucores\":\"20\",\"nvidia.com/gpumem\":\"800\"}},\"volumeMounts\":[{\"mountPath\":\"/workloads\",\"name\":\"workloads\"}]}],\"restartPolicy\":\"Never\",\"volumes\":[{\"configMap\":{\"name\":\"hami-benchmark-mini-workloads\"},\"name\":\"workloads\"}]}},\"ttlSecondsAfterFinished\":3600}}\n"
+        },
+        "creationTimestamp": "2026-03-17T09:34:56Z",
+        "generation": 1,
+        "labels": {
+          "benchmark.hami.io/mode": "hami-only",
+          "benchmark.hami.io/plan": "mini",
+          "benchmark.hami.io/workload": "short-inference"
+        },
+        "name": "mini-short-inference-3",
+        "namespace": "hami-benchmark-mini",
+        "resourceVersion": "57295",
+        "uid": "3842b8cd-402e-4261-88fd-6c30d41914f2"
+      },
+      "spec": {
+        "backoffLimit": 0,
+        "completionMode": "NonIndexed",
+        "completions": 1,
+        "manualSelector": false,
+        "parallelism": 1,
+        "podReplacementPolicy": "TerminatingOrFailed",
+        "selector": {
+          "matchLabels": {
+            "batch.kubernetes.io/controller-uid": "3842b8cd-402e-4261-88fd-6c30d41914f2"
+          }
+        },
+        "suspend": false,
+        "template": {
+          "metadata": {
+            "labels": {
+              "batch.kubernetes.io/controller-uid": "3842b8cd-402e-4261-88fd-6c30d41914f2",
+              "batch.kubernetes.io/job-name": "mini-short-inference-3",
+              "benchmark.hami.io/mode": "hami-only",
+              "benchmark.hami.io/plan": "mini",
+              "benchmark.hami.io/workload": "short-inference",
+              "controller-uid": "3842b8cd-402e-4261-88fd-6c30d41914f2",
+              "job-name": "mini-short-inference-3"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "command": [
+                  "python",
+                  "/workloads/mini_workload.py"
+                ],
+                "env": [
+                  {
+                    "name": "WORKLOAD_KIND",
+                    "value": "short-inference"
+                  },
+                  {
+                    "name": "WORKLOAD_RUNTIME_SECONDS",
+                    "value": "20"
+                  },
+                  {
+                    "name": "WORKLOAD_RESERVE_MIB",
+                    "value": "400"
+                  },
+                  {
+                    "name": "WORKLOAD_BATCH_SIZE",
+                    "value": "256"
+                  }
+                ],
+                "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "worker",
+                "resources": {
+                  "limits": {
+                    "nvidia.com/gpu": "1",
+                    "nvidia.com/gpucores": "20",
+                    "nvidia.com/gpumem": "800"
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/workloads",
+                    "name": "workloads"
+                  }
+                ]
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "restartPolicy": "Never",
+            "schedulerName": "default-scheduler",
+            "securityContext": {},
+            "terminationGracePeriodSeconds": 30,
+            "volumes": [
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "hami-benchmark-mini-workloads"
+                },
+                "name": "workloads"
+              }
+            ]
+          }
+        },
+        "ttlSecondsAfterFinished": 3600
+      },
+      "status": {
+        "active": 1,
+        "ready": 0,
+        "startTime": "2026-03-17T09:34:56Z",
+        "terminating": 0,
+        "uncountedTerminatedPods": {}
+      }
+    }
+  ],
+  "kind": "List",
+  "metadata": {
+    "resourceVersion": ""
+  }
+}

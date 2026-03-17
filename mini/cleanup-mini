@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+NAMESPACE="${NAMESPACE:-hami-benchmark-mini}"
+CONFIGMAP_NAME="${CONFIGMAP_NAME:-hami-benchmark-mini-workloads}"
+
+need_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+need_cmd kubectl
+
+echo "==> Removing mini benchmark jobs from namespace: $NAMESPACE"
+kubectl delete job -n "$NAMESPACE" -l benchmark.hami.io/plan=mini --ignore-not-found=true
+
+echo "==> Removing mini benchmark pods from namespace: $NAMESPACE"
+kubectl delete pod -n "$NAMESPACE" -l benchmark.hami.io/plan=mini --ignore-not-found=true --force --grace-period=0
+kubectl wait -n "$NAMESPACE" --for=delete pod -l benchmark.hami.io/plan=mini --timeout=120s >/dev/null 2>&1 || true
+
+echo "==> Removing workload configmap: $CONFIGMAP_NAME"
+kubectl delete configmap "$CONFIGMAP_NAME" -n "$NAMESPACE" --ignore-not-found=true
+
+echo "Mini benchmark cleanup finished."

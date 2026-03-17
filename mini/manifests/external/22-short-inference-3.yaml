@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mini-short-inference-3
+  labels:
+    benchmark.hami.io/plan: mini
+    benchmark.hami.io/mode: external
+    benchmark.hami.io/workload: short-inference
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        benchmark.hami.io/plan: mini
+        benchmark.hami.io/mode: external
+        benchmark.hami.io/workload: short-inference
+      annotations:
+        external-scheduler.hami.io/enabled: "true"
+        external-scheduler.hami.io/class: latency-sensitive
+        external-scheduler.hami.io/runtime-seconds: "20"
+        external-scheduler.hami.io/gpu-mem-mib: "800"
+    spec:
+      schedulingGates:
+        - name: external-scheduler.hami.io/admission
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime
+          imagePullPolicy: IfNotPresent
+          command: ["python", "/workloads/mini_workload.py"]
+          env:
+            - name: WORKLOAD_KIND
+              value: short-inference
+            - name: WORKLOAD_RUNTIME_SECONDS
+              value: "20"
+            - name: WORKLOAD_RESERVE_MIB
+              value: "400"
+            - name: WORKLOAD_BATCH_SIZE
+              value: "256"
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+              nvidia.com/gpumem: "800"
+              nvidia.com/gpucores: "10"
+          volumeMounts:
+            - name: workloads
+              mountPath: /workloads
+      volumes:
+        - name: workloads
+          configMap:
+            name: hami-benchmark-mini-workloads
+---

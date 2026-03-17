@@ -1,0 +1,73 @@
+benchmark:
+  name: single-4070super-full-round
+  objective:
+    primary:
+      - average_completion_time
+      - gpu_utilization
+      - gpu_memory_utilization
+    secondary:
+      - p95_completion_time
+      - oom_count
+      - queued_job_stall_count
+  cluster:
+    gpu_model: RTX_4070_SUPER
+    gpu_count: 1
+    runtime: minikube_plus_hami
+  expected_duration_minutes: 10_to_20
+  mix:
+    short_inference: 7
+    medium_inference: 2
+    background_training: 1
+  workloads:
+    - name: short-inference
+      purpose: reduce_average_completion_time
+      recommended_real_task: sentence_embedding_inference
+      scheduler_annotations:
+        external-scheduler.hami.io/enabled: "true"
+        external-scheduler.hami.io/class: latency-sensitive
+        external-scheduler.hami.io/runtime-seconds: "30"
+        external-scheduler.hami.io/gpu-mem-mib: "1000"
+      hami_resources:
+        nvidia.com/gpu: "1"
+        nvidia.com/gpumem: "1000"
+        nvidia.com/gpucores: "20"
+    - name: medium-inference
+      purpose: increase_gpu_and_memory_utilization
+      recommended_real_task: yolov8n_inference
+      scheduler_annotations:
+        external-scheduler.hami.io/enabled: "true"
+        external-scheduler.hami.io/class: throughput
+        external-scheduler.hami.io/runtime-seconds: "90"
+        external-scheduler.hami.io/gpu-mem-mib: "2200"
+      hami_resources:
+        nvidia.com/gpu: "1"
+        nvidia.com/gpumem: "2200"
+        nvidia.com/gpucores: "35"
+    - name: background-training
+      purpose: create_long_running_interference
+      recommended_real_task: cifar10_resnet18_training
+      scheduler_annotations:
+        external-scheduler.hami.io/enabled: "true"
+        external-scheduler.hami.io/class: background
+        external-scheduler.hami.io/runtime-seconds: "600"
+        external-scheduler.hami.io/gpu-mem-mib: "4000"
+      hami_resources:
+        nvidia.com/gpu: "1"
+        nvidia.com/gpumem: "4000"
+        nvidia.com/gpucores: "45"
+  submission_pattern:
+    arrival_window_seconds: 30
+    order:
+      - background-training
+      - medium-inference
+      - medium-inference
+      - short-inference
+      - short-inference
+      - short-inference
+      - short-inference
+      - short-inference
+      - short-inference
+      - short-inference
+  comparison_modes:
+    - hami_only
+    - hami_plus_external_scheduler

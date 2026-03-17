@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MODE="${1:-}"
+NAMESPACE="${NAMESPACE:-hami-benchmark-mini}"
+CONFIGMAP_NAME="${CONFIGMAP_NAME:-hami-benchmark-mini-workloads}"
+PROFILE="${PROFILE:-minikube}"
+GPU_TOTAL_MIB="${GPU_TOTAL_MIB:-12288}"
+WAIT_TIMEOUT="${WAIT_TIMEOUT:-1200s}"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ./run-mini-common <hami-only|external>
+EOF
+}
+
+if [[ "$MODE" != "hami-only" && "$MODE" != "external" ]]; then
+  usage >&2
+  exit 1
+fi
+
+need_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+need_cmd kubectl
+need_cmd minikube
+need_cmd python3
+
+METRICS_ENDPOINT="${HAMI_METRICS_ENDPOINT:-http://$(minikube -p "$PROFILE" ip):31992/metrics}"
+SELECTOR="benchmark.hami.io/plan=mini,benchmark.hami.io/mode=${MODE}"
+TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+LOG_DIR="$ROOT_DIR/logs/${TIMESTAMP}-${MODE}"
+SAMPLER_PID=""
+
+cleanup() {
+  local status=$?
+  trap - EXIT INT TERM
+  if [[ -n "$SAMPLER_PID" ]] && kill -0 "$SAMPLER_PID" 2>/dev/null; then
+    kill "$SAMPLER_PID" 2>/dev/null || true
+    wait "$SAMPLER_PID" 2>/dev/null || true
+  fi
+  python3 "$ROOT_DIR/tools/benchmark_logger.py" summarize \
+    --namespace "$NAMESPACE" \
+    --selector "$SELECTOR" \
+    --metrics-endpoint "$METRICS_ENDPOINT" \
+    --gpu-total-mib "$GPU_TOTAL_MIB" \
+    --log-dir "$LOG_DIR" \
+    --mode "$MODE" || true
+  exit "$status"
+}
+
+trap cleanup EXIT INT TERM
+
+mkdir -p "$LOG_DIR"
+exec > >(tee -a "$LOG_DIR/run.log") 2>&1
+
+echo "==> Mini benchmark mode: $MODE"
+echo "==> Namespace: $NAMESPACE"
+echo "==> Metrics endpoint: $METRICS_ENDPOINT"
+echo "==> Log dir: $LOG_DIR"
+
+echo "==> Ensuring namespace: $NAMESPACE"
+kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$NAMESPACE"
+
+echo "==> Refreshing workload configmap: $CONFIGMAP_NAME"
+kubectl -n "$NAMESPACE" create configmap "$CONFIGMAP_NAME" \
+  --from-file=mini_workload.py="$ROOT_DIR/workloads/mini_workload.py" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+echo "==> Cleaning previous mini jobs"
+kubectl delete job -n "$NAMESPACE" -l benchmark.hami.io/plan=mini --ignore-not-found=true >/dev/null 2>&1 || true
+
+echo "==> Starting metric sampler"
+python3 "$ROOT_DIR/tools/benchmark_logger.py" sample \
+  --namespace "$NAMESPACE" \
+  --selector "$SELECTOR" \
+  --metrics-endpoint "$METRICS_ENDPOINT" \
+  --gpu-total-mib "$GPU_TOTAL_MIB" \
+  --log-dir "$LOG_DIR" \
+  --interval-seconds 2 &
+SAMPLER_PID=$!
+
+MANIFEST_DIR="$ROOT_DIR/manifests/${MODE}"
+
+echo "==> Submitting mini round"
+for manifest in \
+  "$MANIFEST_DIR/00-background-training.yaml" \
+  "$MANIFEST_DIR/10-medium-inference-1.yaml" \
+  "$MANIFEST_DIR/20-short-inference-1.yaml" \
+  "$MANIFEST_DIR/21-short-inference-2.yaml" \
+  "$MANIFEST_DIR/22-short-inference-3.yaml"
+do
+  kubectl apply -n "$NAMESPACE" -f "$manifest"
+  sleep 3
+done
+
+echo "==> Waiting for jobs to complete"
+for job in \
+  mini-background-training \
+  mini-medium-inference-1 \
+  mini-short-inference-1 \
+  mini-short-inference-2 \
+  mini-short-inference-3
+do
+  kubectl wait -n "$NAMESPACE" --for=condition=complete "job/${job}" --timeout="$WAIT_TIMEOUT"
+done
+
+echo "Mini benchmark run completed successfully."

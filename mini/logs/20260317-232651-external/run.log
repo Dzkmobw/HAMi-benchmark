@@ -1,0 +1,38 @@
+==> Mini benchmark mode: external
+==> Namespace: hami-benchmark-mini-run6
+==> Metrics endpoint: http://192.168.49.2:31992/metrics
+==> Log dir: /home/ttk/project/HAMi-benchmark/mini/logs/20260317-232651-external
+==> Ensuring namespace: hami-benchmark-mini-run6
+namespace/hami-benchmark-mini-run6 created
+==> Refreshing workload configmap: hami-benchmark-mini-workloads
+configmap/hami-benchmark-mini-workloads created
+==> Cleaning previous mini jobs
+==> Starting metric sampler
+==> Submitting mini round
+job.batch/mini-background-training created
+job.batch/mini-medium-inference-1 created
+job.batch/mini-short-inference-1 created
+job.batch/mini-short-inference-2 created
+job.batch/mini-short-inference-3 created
+==> Waiting for jobs to complete
+job.batch/mini-background-training condition met
+job.batch/mini-medium-inference-1 condition met
+job.batch/mini-short-inference-1 condition met
+job.batch/mini-short-inference-2 condition met
+job.batch/mini-short-inference-3 condition met
+Mini benchmark run completed successfully.
+mode: external
+namespace: hami-benchmark-mini-run6
+selector: benchmark.hami.io/plan=mini,benchmark.hami.io/mode=external
+metrics_endpoint: http://192.168.49.2:31992/metrics
+job_count: 5
+pod_count: 5
+completed_pod_count: 5
+average_completion_time_seconds: 111.2
+average_runtime_seconds: 61.4
+average_queue_delay_seconds: 49.8
+average_gpu_utilization_percent: 57.043010752688176
+average_gpu_memory_utilization_percent: 31.907790536094307
+average_gpu_memory_used_mib: 3920.8293010752686
+max_gpu_utilization_percent: 99.0
+max_gpu_memory_utilization_percent: 38.97908528645833

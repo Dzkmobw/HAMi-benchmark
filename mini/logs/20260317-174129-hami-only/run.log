@@ -1,0 +1,16 @@
+==> Mini benchmark mode: hami-only
+==> Namespace: hami-benchmark-mini
+==> Metrics endpoint: http://192.168.49.2:31992/metrics
+==> Log dir: /home/ttk/project/HAMi-benchmark/mini/logs/20260317-174129-hami-only
+==> Ensuring namespace: hami-benchmark-mini
+==> Refreshing workload configmap: hami-benchmark-mini-workloads
+configmap/hami-benchmark-mini-workloads created
+==> Cleaning previous mini jobs
+==> Starting metric sampler
+==> Submitting mini round
+job.batch/mini-background-training created
+job.batch/mini-medium-inference-1 created
+job.batch/mini-short-inference-1 created
+job.batch/mini-short-inference-2 created
+job.batch/mini-short-inference-3 created
+==> Waiting for jobs to complete

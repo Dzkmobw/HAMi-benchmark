@@ -1,0 +1,70 @@
+{
+  "mode": "hami-only",
+  "namespace": "hami-benchmark-mini-run3",
+  "selector": "benchmark.hami.io/plan=mini,benchmark.hami.io/mode=hami-only",
+  "metrics_endpoint": "http://192.168.49.2:31992/metrics",
+  "gpu_total_mib": 12288.0,
+  "job_count": 5,
+  "pod_count": 5,
+  "completed_pod_count": 0,
+  "average_completion_time_seconds": null,
+  "average_runtime_seconds": null,
+  "average_queue_delay_seconds": null,
+  "average_gpu_utilization_percent": 2.683333333333333,
+  "average_gpu_memory_utilization_percent": 5.000220404730902,
+  "average_gpu_memory_used_mib": 614.4270833333334,
+  "max_gpu_utilization_percent": 99.0,
+  "max_gpu_memory_utilization_percent": 26.476033528645832,
+  "pods": [
+    {
+      "name": "mini-background-training-wvz7k",
+      "phase": "Pending",
+      "creation_timestamp": "2026-03-17T09:46:32Z",
+      "start_time": null,
+      "finish_time": null,
+      "elapsed_submission_to_completion_seconds": null,
+      "runtime_seconds": null,
+      "queue_delay_seconds": null
+    },
+    {
+      "name": "mini-medium-inference-1-cj2d6",
+      "phase": "Pending",
+      "creation_timestamp": "2026-03-17T09:46:35Z",
+      "start_time": null,
+      "finish_time": null,
+      "elapsed_submission_to_completion_seconds": null,
+      "runtime_seconds": null,
+      "queue_delay_seconds": null
+    },
+    {
+      "name": "mini-short-inference-1-ljnxv",
+      "phase": "Pending",
+      "creation_timestamp": "2026-03-17T09:46:38Z",
+      "start_time": null,
+      "finish_time": null,
+      "elapsed_submission_to_completion_seconds": null,
+      "runtime_seconds": null,
+      "queue_delay_seconds": null
+    },
+    {
+      "name": "mini-short-inference-2-lvz68",
+      "phase": "Pending",
+      "creation_timestamp": "2026-03-17T09:46:41Z",
+      "start_time": null,
+      "finish_time": null,
+      "elapsed_submission_to_completion_seconds": null,
+      "runtime_seconds": null,
+      "queue_delay_seconds": null
+    },
+    {
+      "name": "mini-short-inference-3-sqv48",
+      "phase": "Pending",
+      "creation_timestamp": "2026-03-17T09:46:44Z",
+      "start_time": null,
+      "finish_time": null,
+      "elapsed_submission_to_completion_seconds": null,
+      "runtime_seconds": null,
+      "queue_delay_seconds": null
+    }
+  ]
+}

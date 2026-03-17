@@ -1,0 +1,15 @@
+mode: hami-only
+namespace: hami-benchmark-mini-run4
+selector: benchmark.hami.io/plan=mini,benchmark.hami.io/mode=hami-only
+metrics_endpoint: http://192.168.49.2:31992/metrics
+job_count: 5
+pod_count: 5
+completed_pod_count: 5
+average_completion_time_seconds: 658.8
+average_runtime_seconds: 61.6
+average_queue_delay_seconds: 597.2
+average_gpu_utilization_percent: 23.255284552845527
+average_gpu_memory_utilization_percent: 8.489223573266006
+average_gpu_memory_used_mib: 1043.1557926829269
+max_gpu_utilization_percent: 99.0
+max_gpu_memory_utilization_percent: 26.5472412109375

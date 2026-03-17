@@ -1,0 +1,1419 @@
+{
+  "apiVersion": "v1",
+  "items": [
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "annotations": {
+          "external-scheduler.hami.io/class": "background",
+          "external-scheduler.hami.io/enabled": "true",
+          "external-scheduler.hami.io/gpu-mem-mib": "3000",
+          "external-scheduler.hami.io/runtime-seconds": "180",
+          "external-scheduler.hami.io/state": "admitted",
+          "hami.io/bind-phase": "success",
+          "hami.io/bind-time": "1773761212",
+          "hami.io/vgpu-devices-allocated": "GPU-a4cf6a2f-57d7-ea10-c57e-961225aad94b,NVIDIA,3000,30:;",
+          "hami.io/vgpu-devices-to-allocate": ";",
+          "hami.io/vgpu-node": "minikube",
+          "hami.io/vgpu-time": "1773761212"
+        },
+        "creationTimestamp": "2026-03-17T15:26:52Z",
+        "generateName": "mini-background-training-",
+        "generation": 2,
+        "labels": {
+          "batch.kubernetes.io/controller-uid": "6492b4ab-6742-4e75-ace1-1fa90a5d78f4",
+          "batch.kubernetes.io/job-name": "mini-background-training",
+          "benchmark.hami.io/mode": "external",
+          "benchmark.hami.io/plan": "mini",
+          "benchmark.hami.io/workload": "background-training",
+          "controller-uid": "6492b4ab-6742-4e75-ace1-1fa90a5d78f4",
+          "hami.io/vgpu-node": "minikube",
+          "job-name": "mini-background-training"
+        },
+        "name": "mini-background-training-5z9tf",
+        "namespace": "hami-benchmark-mini-run6",
+        "ownerReferences": [
+          {
+            "apiVersion": "batch/v1",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "Job",
+            "name": "mini-background-training",
+            "uid": "6492b4ab-6742-4e75-ace1-1fa90a5d78f4"
+          }
+        ],
+        "resourceVersion": "87786",
+        "uid": "d1ba544d-c1a5-4114-b2de-aa0f5caeabee"
+      },
+      "spec": {
+        "containers": [
+          {
+            "command": [
+              "python",
+              "/workloads/mini_workload.py"
+            ],
+            "env": [
+              {
+                "name": "WORKLOAD_KIND",
+                "value": "background-training"
+              },
+              {
+                "name": "WORKLOAD_RUNTIME_SECONDS",
+                "value": "180"
+              },
+              {
+                "name": "WORKLOAD_RESERVE_MIB",
+                "value": "2200"
+              },
+              {
+                "name": "WORKLOAD_BATCH_SIZE",
+                "value": "64"
+              }
+            ],
+            "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+            "imagePullPolicy": "IfNotPresent",
+            "name": "worker",
+            "resources": {
+              "limits": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "30",
+                "nvidia.com/gpumem": "3k"
+              },
+              "requests": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "30",
+                "nvidia.com/gpumem": "3k"
+              }
+            },
+            "terminationMessagePath": "/dev/termination-log",
+            "terminationMessagePolicy": "File",
+            "volumeMounts": [
+              {
+                "mountPath": "/workloads",
+                "name": "workloads"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-jp82p",
+                "readOnly": true
+              }
+            ]
+          }
+        ],
+        "dnsPolicy": "ClusterFirst",
+        "enableServiceLinks": true,
+        "nodeName": "minikube",
+        "preemptionPolicy": "PreemptLowerPriority",
+        "priority": 0,
+        "restartPolicy": "Never",
+        "schedulerName": "hami-scheduler",
+        "securityContext": {},
+        "serviceAccount": "default",
+        "serviceAccountName": "default",
+        "terminationGracePeriodSeconds": 30,
+        "tolerations": [
+          {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/not-ready",
+            "operator": "Exists",
+            "tolerationSeconds": 300
+          },
+          {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/unreachable",
+            "operator": "Exists",
+            "tolerationSeconds": 300
+          }
+        ],
+        "volumes": [
+          {
+            "configMap": {
+              "defaultMode": 420,
+              "name": "hami-benchmark-mini-workloads"
+            },
+            "name": "workloads"
+          },
+          {
+            "name": "kube-api-access-jp82p",
+            "projected": {
+              "defaultMode": 420,
+              "sources": [
+                {
+                  "serviceAccountToken": {
+                    "expirationSeconds": 3607,
+                    "path": "token"
+                  }
+                },
+                {
+                  "configMap": {
+                    "items": [
+                      {
+                        "key": "ca.crt",
+                        "path": "ca.crt"
+                      }
+                    ],
+                    "name": "kube-root-ca.crt"
+                  }
+                },
+                {
+                  "downwardAPI": {
+                    "items": [
+                      {
+                        "fieldRef": {
+                          "apiVersion": "v1",
+                          "fieldPath": "metadata.namespace"
+                        },
+                        "path": "namespace"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "status": {
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:29:55Z",
+            "observedGeneration": 2,
+            "status": "False",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:26:52Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:29:54Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:29:54Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "False",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:26:52Z",
+            "observedGeneration": 2,
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "allocatedResources": {
+              "nvidia.com/gpu": "1",
+              "nvidia.com/gpucores": "30",
+              "nvidia.com/gpumem": "3k"
+            },
+            "containerID": "docker://e1331d04e2a5e227870dbc8f16dd566f55b376dcf4d2e62f3dab8e6cc4c4e748",
+            "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+            "imageID": "docker-pullable://pytorch/pytorch@sha256:831247999fbf7e08f61b3e39f6d77ee434f38f6f07f769d00db451e853878067",
+            "lastState": {},
+            "name": "worker",
+            "ready": false,
+            "resources": {
+              "limits": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "30",
+                "nvidia.com/gpumem": "3k"
+              },
+              "requests": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "30",
+                "nvidia.com/gpumem": "3k"
+              }
+            },
+            "restartCount": 0,
+            "started": false,
+            "state": {
+              "terminated": {
+                "containerID": "docker://e1331d04e2a5e227870dbc8f16dd566f55b376dcf4d2e62f3dab8e6cc4c4e748",
+                "exitCode": 0,
+                "finishedAt": "2026-03-17T15:29:54Z",
+                "reason": "Completed",
+                "startedAt": "2026-03-17T15:26:52Z"
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/workloads",
+                "name": "workloads"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-jp82p",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "hostIP": "192.168.49.2",
+        "hostIPs": [
+          {
+            "ip": "192.168.49.2"
+          }
+        ],
+        "observedGeneration": 2,
+        "phase": "Succeeded",
+        "podIP": "10.244.0.88",
+        "podIPs": [
+          {
+            "ip": "10.244.0.88"
+          }
+        ],
+        "qosClass": "BestEffort",
+        "startTime": "2026-03-17T15:26:52Z"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "annotations": {
+          "external-scheduler.hami.io/class": "throughput",
+          "external-scheduler.hami.io/enabled": "true",
+          "external-scheduler.hami.io/gpu-mem-mib": "1800",
+          "external-scheduler.hami.io/runtime-seconds": "60",
+          "external-scheduler.hami.io/state": "admitted",
+          "hami.io/bind-phase": "success",
+          "hami.io/bind-time": "1773761216",
+          "hami.io/vgpu-devices-allocated": "GPU-a4cf6a2f-57d7-ea10-c57e-961225aad94b,NVIDIA,1800,20:;",
+          "hami.io/vgpu-devices-to-allocate": ";",
+          "hami.io/vgpu-node": "minikube",
+          "hami.io/vgpu-time": "1773761216"
+        },
+        "creationTimestamp": "2026-03-17T15:26:55Z",
+        "generateName": "mini-medium-inference-1-",
+        "generation": 2,
+        "labels": {
+          "batch.kubernetes.io/controller-uid": "f084151f-ec3e-49f2-a061-0c5f7faeac7c",
+          "batch.kubernetes.io/job-name": "mini-medium-inference-1",
+          "benchmark.hami.io/mode": "external",
+          "benchmark.hami.io/plan": "mini",
+          "benchmark.hami.io/workload": "medium-inference",
+          "controller-uid": "f084151f-ec3e-49f2-a061-0c5f7faeac7c",
+          "hami.io/vgpu-node": "minikube",
+          "job-name": "mini-medium-inference-1"
+        },
+        "name": "mini-medium-inference-1-7x5dr",
+        "namespace": "hami-benchmark-mini-run6",
+        "ownerReferences": [
+          {
+            "apiVersion": "batch/v1",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "Job",
+            "name": "mini-medium-inference-1",
+            "uid": "f084151f-ec3e-49f2-a061-0c5f7faeac7c"
+          }
+        ],
+        "resourceVersion": "87555",
+        "uid": "69590332-8ae7-42ea-8db3-bca1eb59d912"
+      },
+      "spec": {
+        "containers": [
+          {
+            "command": [
+              "python",
+              "/workloads/mini_workload.py"
+            ],
+            "env": [
+              {
+                "name": "WORKLOAD_KIND",
+                "value": "medium-inference"
+              },
+              {
+                "name": "WORKLOAD_RUNTIME_SECONDS",
+                "value": "60"
+              },
+              {
+                "name": "WORKLOAD_RESERVE_MIB",
+                "value": "1200"
+              },
+              {
+                "name": "WORKLOAD_BATCH_SIZE",
+                "value": "8"
+              }
+            ],
+            "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+            "imagePullPolicy": "IfNotPresent",
+            "name": "worker",
+            "resources": {
+              "limits": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "20",
+                "nvidia.com/gpumem": "1800"
+              },
+              "requests": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "20",
+                "nvidia.com/gpumem": "1800"
+              }
+            },
+            "terminationMessagePath": "/dev/termination-log",
+            "terminationMessagePolicy": "File",
+            "volumeMounts": [
+              {
+                "mountPath": "/workloads",
+                "name": "workloads"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-wnkgw",
+                "readOnly": true
+              }
+            ]
+          }
+        ],
+        "dnsPolicy": "ClusterFirst",
+        "enableServiceLinks": true,
+        "nodeName": "minikube",
+        "preemptionPolicy": "PreemptLowerPriority",
+        "priority": 0,
+        "restartPolicy": "Never",
+        "schedulerName": "hami-scheduler",
+        "securityContext": {},
+        "serviceAccount": "default",
+        "serviceAccountName": "default",
+        "terminationGracePeriodSeconds": 30,
+        "tolerations": [
+          {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/not-ready",
+            "operator": "Exists",
+            "tolerationSeconds": 300
+          },
+          {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/unreachable",
+            "operator": "Exists",
+            "tolerationSeconds": 300
+          }
+        ],
+        "volumes": [
+          {
+            "configMap": {
+              "defaultMode": 420,
+              "name": "hami-benchmark-mini-workloads"
+            },
+            "name": "workloads"
+          },
+          {
+            "name": "kube-api-access-wnkgw",
+            "projected": {
+              "defaultMode": 420,
+              "sources": [
+                {
+                  "serviceAccountToken": {
+                    "expirationSeconds": 3607,
+                    "path": "token"
+                  }
+                },
+                {
+                  "configMap": {
+                    "items": [
+                      {
+                        "key": "ca.crt",
+                        "path": "ca.crt"
+                      }
+                    ],
+                    "name": "kube-root-ca.crt"
+                  }
+                },
+                {
+                  "downwardAPI": {
+                    "items": [
+                      {
+                        "fieldRef": {
+                          "apiVersion": "v1",
+                          "fieldPath": "metadata.namespace"
+                        },
+                        "path": "namespace"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "status": {
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:27:59Z",
+            "observedGeneration": 2,
+            "status": "False",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:26:56Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:27:57Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:27:57Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "False",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:26:56Z",
+            "observedGeneration": 2,
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "allocatedResources": {
+              "nvidia.com/gpu": "1",
+              "nvidia.com/gpucores": "20",
+              "nvidia.com/gpumem": "1800"
+            },
+            "containerID": "docker://0c5acbbf16b6f48d0ac9bf11ed12e03fc429a208be95879df4e8d38f6047efe8",
+            "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+            "imageID": "docker-pullable://pytorch/pytorch@sha256:831247999fbf7e08f61b3e39f6d77ee434f38f6f07f769d00db451e853878067",
+            "lastState": {},
+            "name": "worker",
+            "ready": false,
+            "resources": {
+              "limits": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "20",
+                "nvidia.com/gpumem": "1800"
+              },
+              "requests": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "20",
+                "nvidia.com/gpumem": "1800"
+              }
+            },
+            "restartCount": 0,
+            "started": false,
+            "state": {
+              "terminated": {
+                "containerID": "docker://0c5acbbf16b6f48d0ac9bf11ed12e03fc429a208be95879df4e8d38f6047efe8",
+                "exitCode": 0,
+                "finishedAt": "2026-03-17T15:27:57Z",
+                "reason": "Completed",
+                "startedAt": "2026-03-17T15:26:56Z"
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/workloads",
+                "name": "workloads"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-wnkgw",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "hostIP": "192.168.49.2",
+        "hostIPs": [
+          {
+            "ip": "192.168.49.2"
+          }
+        ],
+        "observedGeneration": 2,
+        "phase": "Succeeded",
+        "podIP": "10.244.0.89",
+        "podIPs": [
+          {
+            "ip": "10.244.0.89"
+          }
+        ],
+        "qosClass": "BestEffort",
+        "startTime": "2026-03-17T15:26:56Z"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "annotations": {
+          "external-scheduler.hami.io/class": "latency-sensitive",
+          "external-scheduler.hami.io/enabled": "true",
+          "external-scheduler.hami.io/gpu-mem-mib": "800",
+          "external-scheduler.hami.io/runtime-seconds": "20",
+          "external-scheduler.hami.io/state": "admitted",
+          "hami.io/bind-phase": "success",
+          "hami.io/bind-time": "1773761280",
+          "hami.io/vgpu-devices-allocated": "GPU-a4cf6a2f-57d7-ea10-c57e-961225aad94b,NVIDIA,800,10:;",
+          "hami.io/vgpu-devices-to-allocate": ";",
+          "hami.io/vgpu-node": "minikube",
+          "hami.io/vgpu-time": "1773761280"
+        },
+        "creationTimestamp": "2026-03-17T15:26:58Z",
+        "generateName": "mini-short-inference-1-",
+        "generation": 2,
+        "labels": {
+          "batch.kubernetes.io/controller-uid": "e924c5b5-9ec9-4156-907f-857bb36c8269",
+          "batch.kubernetes.io/job-name": "mini-short-inference-1",
+          "benchmark.hami.io/mode": "external",
+          "benchmark.hami.io/plan": "mini",
+          "benchmark.hami.io/workload": "short-inference",
+          "controller-uid": "e924c5b5-9ec9-4156-907f-857bb36c8269",
+          "hami.io/vgpu-node": "minikube",
+          "job-name": "mini-short-inference-1"
+        },
+        "name": "mini-short-inference-1-jlx9r",
+        "namespace": "hami-benchmark-mini-run6",
+        "ownerReferences": [
+          {
+            "apiVersion": "batch/v1",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "Job",
+            "name": "mini-short-inference-1",
+            "uid": "e924c5b5-9ec9-4156-907f-857bb36c8269"
+          }
+        ],
+        "resourceVersion": "87625",
+        "uid": "7fea1e5f-edcb-45be-be42-356193bc06b9"
+      },
+      "spec": {
+        "containers": [
+          {
+            "command": [
+              "python",
+              "/workloads/mini_workload.py"
+            ],
+            "env": [
+              {
+                "name": "WORKLOAD_KIND",
+                "value": "short-inference"
+              },
+              {
+                "name": "WORKLOAD_RUNTIME_SECONDS",
+                "value": "20"
+              },
+              {
+                "name": "WORKLOAD_RESERVE_MIB",
+                "value": "400"
+              },
+              {
+                "name": "WORKLOAD_BATCH_SIZE",
+                "value": "256"
+              }
+            ],
+            "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+            "imagePullPolicy": "IfNotPresent",
+            "name": "worker",
+            "resources": {
+              "limits": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "10",
+                "nvidia.com/gpumem": "800"
+              },
+              "requests": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "10",
+                "nvidia.com/gpumem": "800"
+              }
+            },
+            "terminationMessagePath": "/dev/termination-log",
+            "terminationMessagePolicy": "File",
+            "volumeMounts": [
+              {
+                "mountPath": "/workloads",
+                "name": "workloads"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-fgp9j",
+                "readOnly": true
+              }
+            ]
+          }
+        ],
+        "dnsPolicy": "ClusterFirst",
+        "enableServiceLinks": true,
+        "nodeName": "minikube",
+        "preemptionPolicy": "PreemptLowerPriority",
+        "priority": 0,
+        "restartPolicy": "Never",
+        "schedulerName": "hami-scheduler",
+        "securityContext": {},
+        "serviceAccount": "default",
+        "serviceAccountName": "default",
+        "terminationGracePeriodSeconds": 30,
+        "tolerations": [
+          {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/not-ready",
+            "operator": "Exists",
+            "tolerationSeconds": 300
+          },
+          {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/unreachable",
+            "operator": "Exists",
+            "tolerationSeconds": 300
+          }
+        ],
+        "volumes": [
+          {
+            "configMap": {
+              "defaultMode": 420,
+              "name": "hami-benchmark-mini-workloads"
+            },
+            "name": "workloads"
+          },
+          {
+            "name": "kube-api-access-fgp9j",
+            "projected": {
+              "defaultMode": 420,
+              "sources": [
+                {
+                  "serviceAccountToken": {
+                    "expirationSeconds": 3607,
+                    "path": "token"
+                  }
+                },
+                {
+                  "configMap": {
+                    "items": [
+                      {
+                        "key": "ca.crt",
+                        "path": "ca.crt"
+                      }
+                    ],
+                    "name": "kube-root-ca.crt"
+                  }
+                },
+                {
+                  "downwardAPI": {
+                    "items": [
+                      {
+                        "fieldRef": {
+                          "apiVersion": "v1",
+                          "fieldPath": "metadata.namespace"
+                        },
+                        "path": "namespace"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "status": {
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:28:23Z",
+            "observedGeneration": 2,
+            "status": "False",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:28:00Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:28:22Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:28:22Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "False",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:28:00Z",
+            "observedGeneration": 2,
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "allocatedResources": {
+              "nvidia.com/gpu": "1",
+              "nvidia.com/gpucores": "10",
+              "nvidia.com/gpumem": "800"
+            },
+            "containerID": "docker://85b07f609f46f94d58af785bbb31dea7e9bae718be8a52e4e3de85494c14a720",
+            "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+            "imageID": "docker-pullable://pytorch/pytorch@sha256:831247999fbf7e08f61b3e39f6d77ee434f38f6f07f769d00db451e853878067",
+            "lastState": {},
+            "name": "worker",
+            "ready": false,
+            "resources": {
+              "limits": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "10",
+                "nvidia.com/gpumem": "800"
+              },
+              "requests": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "10",
+                "nvidia.com/gpumem": "800"
+              }
+            },
+            "restartCount": 0,
+            "started": false,
+            "state": {
+              "terminated": {
+                "containerID": "docker://85b07f609f46f94d58af785bbb31dea7e9bae718be8a52e4e3de85494c14a720",
+                "exitCode": 0,
+                "finishedAt": "2026-03-17T15:28:22Z",
+                "reason": "Completed",
+                "startedAt": "2026-03-17T15:28:01Z"
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/workloads",
+                "name": "workloads"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-fgp9j",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "hostIP": "192.168.49.2",
+        "hostIPs": [
+          {
+            "ip": "192.168.49.2"
+          }
+        ],
+        "observedGeneration": 2,
+        "phase": "Succeeded",
+        "podIP": "10.244.0.90",
+        "podIPs": [
+          {
+            "ip": "10.244.0.90"
+          }
+        ],
+        "qosClass": "BestEffort",
+        "startTime": "2026-03-17T15:28:00Z"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "annotations": {
+          "external-scheduler.hami.io/class": "latency-sensitive",
+          "external-scheduler.hami.io/enabled": "true",
+          "external-scheduler.hami.io/gpu-mem-mib": "800",
+          "external-scheduler.hami.io/runtime-seconds": "20",
+          "external-scheduler.hami.io/state": "admitted",
+          "hami.io/bind-phase": "success",
+          "hami.io/bind-time": "1773761303",
+          "hami.io/vgpu-devices-allocated": "GPU-a4cf6a2f-57d7-ea10-c57e-961225aad94b,NVIDIA,800,10:;",
+          "hami.io/vgpu-devices-to-allocate": ";",
+          "hami.io/vgpu-node": "minikube",
+          "hami.io/vgpu-time": "1773761303"
+        },
+        "creationTimestamp": "2026-03-17T15:27:01Z",
+        "generateName": "mini-short-inference-2-",
+        "generation": 2,
+        "labels": {
+          "batch.kubernetes.io/controller-uid": "35bb3f21-0579-45cb-9b05-9011e534c08c",
+          "batch.kubernetes.io/job-name": "mini-short-inference-2",
+          "benchmark.hami.io/mode": "external",
+          "benchmark.hami.io/plan": "mini",
+          "benchmark.hami.io/workload": "short-inference",
+          "controller-uid": "35bb3f21-0579-45cb-9b05-9011e534c08c",
+          "hami.io/vgpu-node": "minikube",
+          "job-name": "mini-short-inference-2"
+        },
+        "name": "mini-short-inference-2-xqdd4",
+        "namespace": "hami-benchmark-mini-run6",
+        "ownerReferences": [
+          {
+            "apiVersion": "batch/v1",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "Job",
+            "name": "mini-short-inference-2",
+            "uid": "35bb3f21-0579-45cb-9b05-9011e534c08c"
+          }
+        ],
+        "resourceVersion": "87666",
+        "uid": "7b3b5ed3-98a9-498c-af02-70b74d478573"
+      },
+      "spec": {
+        "containers": [
+          {
+            "command": [
+              "python",
+              "/workloads/mini_workload.py"
+            ],
+            "env": [
+              {
+                "name": "WORKLOAD_KIND",
+                "value": "short-inference"
+              },
+              {
+                "name": "WORKLOAD_RUNTIME_SECONDS",
+                "value": "20"
+              },
+              {
+                "name": "WORKLOAD_RESERVE_MIB",
+                "value": "400"
+              },
+              {
+                "name": "WORKLOAD_BATCH_SIZE",
+                "value": "256"
+              }
+            ],
+            "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+            "imagePullPolicy": "IfNotPresent",
+            "name": "worker",
+            "resources": {
+              "limits": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "10",
+                "nvidia.com/gpumem": "800"
+              },
+              "requests": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "10",
+                "nvidia.com/gpumem": "800"
+              }
+            },
+            "terminationMessagePath": "/dev/termination-log",
+            "terminationMessagePolicy": "File",
+            "volumeMounts": [
+              {
+                "mountPath": "/workloads",
+                "name": "workloads"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-26rsb",
+                "readOnly": true
+              }
+            ]
+          }
+        ],
+        "dnsPolicy": "ClusterFirst",
+        "enableServiceLinks": true,
+        "nodeName": "minikube",
+        "preemptionPolicy": "PreemptLowerPriority",
+        "priority": 0,
+        "restartPolicy": "Never",
+        "schedulerName": "hami-scheduler",
+        "securityContext": {},
+        "serviceAccount": "default",
+        "serviceAccountName": "default",
+        "terminationGracePeriodSeconds": 30,
+        "tolerations": [
+          {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/not-ready",
+            "operator": "Exists",
+            "tolerationSeconds": 300
+          },
+          {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/unreachable",
+            "operator": "Exists",
+            "tolerationSeconds": 300
+          }
+        ],
+        "volumes": [
+          {
+            "configMap": {
+              "defaultMode": 420,
+              "name": "hami-benchmark-mini-workloads"
+            },
+            "name": "workloads"
+          },
+          {
+            "name": "kube-api-access-26rsb",
+            "projected": {
+              "defaultMode": 420,
+              "sources": [
+                {
+                  "serviceAccountToken": {
+                    "expirationSeconds": 3607,
+                    "path": "token"
+                  }
+                },
+                {
+                  "configMap": {
+                    "items": [
+                      {
+                        "key": "ca.crt",
+                        "path": "ca.crt"
+                      }
+                    ],
+                    "name": "kube-root-ca.crt"
+                  }
+                },
+                {
+                  "downwardAPI": {
+                    "items": [
+                      {
+                        "fieldRef": {
+                          "apiVersion": "v1",
+                          "fieldPath": "metadata.namespace"
+                        },
+                        "path": "namespace"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "status": {
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:28:46Z",
+            "observedGeneration": 2,
+            "status": "False",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:28:23Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:28:45Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:28:45Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "False",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:28:23Z",
+            "observedGeneration": 2,
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "allocatedResources": {
+              "nvidia.com/gpu": "1",
+              "nvidia.com/gpucores": "10",
+              "nvidia.com/gpumem": "800"
+            },
+            "containerID": "docker://80d414b3be8bc6398edbe8bad463609665362df8845068abfaf7f3f401581b05",
+            "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+            "imageID": "docker-pullable://pytorch/pytorch@sha256:831247999fbf7e08f61b3e39f6d77ee434f38f6f07f769d00db451e853878067",
+            "lastState": {},
+            "name": "worker",
+            "ready": false,
+            "resources": {
+              "limits": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "10",
+                "nvidia.com/gpumem": "800"
+              },
+              "requests": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "10",
+                "nvidia.com/gpumem": "800"
+              }
+            },
+            "restartCount": 0,
+            "started": false,
+            "state": {
+              "terminated": {
+                "containerID": "docker://80d414b3be8bc6398edbe8bad463609665362df8845068abfaf7f3f401581b05",
+                "exitCode": 0,
+                "finishedAt": "2026-03-17T15:28:44Z",
+                "reason": "Completed",
+                "startedAt": "2026-03-17T15:28:23Z"
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/workloads",
+                "name": "workloads"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-26rsb",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "hostIP": "192.168.49.2",
+        "hostIPs": [
+          {
+            "ip": "192.168.49.2"
+          }
+        ],
+        "observedGeneration": 2,
+        "phase": "Succeeded",
+        "podIP": "10.244.0.91",
+        "podIPs": [
+          {
+            "ip": "10.244.0.91"
+          }
+        ],
+        "qosClass": "BestEffort",
+        "startTime": "2026-03-17T15:28:23Z"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "annotations": {
+          "external-scheduler.hami.io/class": "latency-sensitive",
+          "external-scheduler.hami.io/enabled": "true",
+          "external-scheduler.hami.io/gpu-mem-mib": "800",
+          "external-scheduler.hami.io/runtime-seconds": "20",
+          "external-scheduler.hami.io/state": "admitted",
+          "hami.io/bind-phase": "success",
+          "hami.io/bind-time": "1773761328",
+          "hami.io/vgpu-devices-allocated": "GPU-a4cf6a2f-57d7-ea10-c57e-961225aad94b,NVIDIA,800,10:;",
+          "hami.io/vgpu-devices-to-allocate": ";",
+          "hami.io/vgpu-node": "minikube",
+          "hami.io/vgpu-time": "1773761328"
+        },
+        "creationTimestamp": "2026-03-17T15:27:04Z",
+        "generateName": "mini-short-inference-3-",
+        "generation": 2,
+        "labels": {
+          "batch.kubernetes.io/controller-uid": "aca9e3e9-46d4-4650-aaeb-fca047ac7302",
+          "batch.kubernetes.io/job-name": "mini-short-inference-3",
+          "benchmark.hami.io/mode": "external",
+          "benchmark.hami.io/plan": "mini",
+          "benchmark.hami.io/workload": "short-inference",
+          "controller-uid": "aca9e3e9-46d4-4650-aaeb-fca047ac7302",
+          "hami.io/vgpu-node": "minikube",
+          "job-name": "mini-short-inference-3"
+        },
+        "name": "mini-short-inference-3-qgrvn",
+        "namespace": "hami-benchmark-mini-run6",
+        "ownerReferences": [
+          {
+            "apiVersion": "batch/v1",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "Job",
+            "name": "mini-short-inference-3",
+            "uid": "aca9e3e9-46d4-4650-aaeb-fca047ac7302"
+          }
+        ],
+        "resourceVersion": "87720",
+        "uid": "e4499fd9-8f00-4ef7-896f-1a51541328cd"
+      },
+      "spec": {
+        "containers": [
+          {
+            "command": [
+              "python",
+              "/workloads/mini_workload.py"
+            ],
+            "env": [
+              {
+                "name": "WORKLOAD_KIND",
+                "value": "short-inference"
+              },
+              {
+                "name": "WORKLOAD_RUNTIME_SECONDS",
+                "value": "20"
+              },
+              {
+                "name": "WORKLOAD_RESERVE_MIB",
+                "value": "400"
+              },
+              {
+                "name": "WORKLOAD_BATCH_SIZE",
+                "value": "256"
+              }
+            ],
+            "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+            "imagePullPolicy": "IfNotPresent",
+            "name": "worker",
+            "resources": {
+              "limits": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "10",
+                "nvidia.com/gpumem": "800"
+              },
+              "requests": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "10",
+                "nvidia.com/gpumem": "800"
+              }
+            },
+            "terminationMessagePath": "/dev/termination-log",
+            "terminationMessagePolicy": "File",
+            "volumeMounts": [
+              {
+                "mountPath": "/workloads",
+                "name": "workloads"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-h9lh8",
+                "readOnly": true
+              }
+            ]
+          }
+        ],
+        "dnsPolicy": "ClusterFirst",
+        "enableServiceLinks": true,
+        "nodeName": "minikube",
+        "preemptionPolicy": "PreemptLowerPriority",
+        "priority": 0,
+        "restartPolicy": "Never",
+        "schedulerName": "hami-scheduler",
+        "securityContext": {},
+        "serviceAccount": "default",
+        "serviceAccountName": "default",
+        "terminationGracePeriodSeconds": 30,
+        "tolerations": [
+          {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/not-ready",
+            "operator": "Exists",
+            "tolerationSeconds": 300
+          },
+          {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/unreachable",
+            "operator": "Exists",
+            "tolerationSeconds": 300
+          }
+        ],
+        "volumes": [
+          {
+            "configMap": {
+              "defaultMode": 420,
+              "name": "hami-benchmark-mini-workloads"
+            },
+            "name": "workloads"
+          },
+          {
+            "name": "kube-api-access-h9lh8",
+            "projected": {
+              "defaultMode": 420,
+              "sources": [
+                {
+                  "serviceAccountToken": {
+                    "expirationSeconds": 3607,
+                    "path": "token"
+                  }
+                },
+                {
+                  "configMap": {
+                    "items": [
+                      {
+                        "key": "ca.crt",
+                        "path": "ca.crt"
+                      }
+                    ],
+                    "name": "kube-root-ca.crt"
+                  }
+                },
+                {
+                  "downwardAPI": {
+                    "items": [
+                      {
+                        "fieldRef": {
+                          "apiVersion": "v1",
+                          "fieldPath": "metadata.namespace"
+                        },
+                        "path": "namespace"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "status": {
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:29:11Z",
+            "observedGeneration": 2,
+            "status": "False",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:28:48Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:29:10Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:29:10Z",
+            "observedGeneration": 2,
+            "reason": "PodCompleted",
+            "status": "False",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-03-17T15:28:48Z",
+            "observedGeneration": 2,
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "allocatedResources": {
+              "nvidia.com/gpu": "1",
+              "nvidia.com/gpucores": "10",
+              "nvidia.com/gpumem": "800"
+            },
+            "containerID": "docker://ce15a6e8dcb33000502af0148e0fe8e72a9acd08886de4a440a1858af2ea20da",
+            "image": "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime",
+            "imageID": "docker-pullable://pytorch/pytorch@sha256:831247999fbf7e08f61b3e39f6d77ee434f38f6f07f769d00db451e853878067",
+            "lastState": {},
+            "name": "worker",
+            "ready": false,
+            "resources": {
+              "limits": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "10",
+                "nvidia.com/gpumem": "800"
+              },
+              "requests": {
+                "nvidia.com/gpu": "1",
+                "nvidia.com/gpucores": "10",
+                "nvidia.com/gpumem": "800"
+              }
+            },
+            "restartCount": 0,
+            "started": false,
+            "state": {
+              "terminated": {
+                "containerID": "docker://ce15a6e8dcb33000502af0148e0fe8e72a9acd08886de4a440a1858af2ea20da",
+                "exitCode": 0,
+                "finishedAt": "2026-03-17T15:29:09Z",
+                "reason": "Completed",
+                "startedAt": "2026-03-17T15:28:48Z"
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/workloads",
+                "name": "workloads"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-h9lh8",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "hostIP": "192.168.49.2",
+        "hostIPs": [
+          {
+            "ip": "192.168.49.2"
+          }
+        ],
+        "observedGeneration": 2,
+        "phase": "Succeeded",
+        "podIP": "10.244.0.92",
+        "podIPs": [
+          {
+            "ip": "10.244.0.92"
+          }
+        ],
+        "qosClass": "BestEffort",
+        "startTime": "2026-03-17T15:28:48Z"
+      }
+    }
+  ],
+  "kind": "List",
+  "metadata": {
+    "resourceVersion": ""
+  }
+}
