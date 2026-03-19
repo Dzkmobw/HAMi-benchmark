@@ -90,26 +90,14 @@ SAMPLER_PID=$!
 MANIFEST_DIR="$ROOT_DIR/manifests/${MODE}"
 
 echo "==> Submitting mini round"
-for manifest in \
-  "$MANIFEST_DIR/00-background-training.yaml" \
-  "$MANIFEST_DIR/10-medium-inference-1.yaml" \
-  "$MANIFEST_DIR/20-short-inference-1.yaml" \
-  "$MANIFEST_DIR/21-short-inference-2.yaml" \
-  "$MANIFEST_DIR/22-short-inference-3.yaml"
-do
+mapfile -t manifests < <(find "$MANIFEST_DIR" -maxdepth 1 -type f -name '*.yaml' | sort)
+
+for manifest in "${manifests[@]}"; do
   kubectl apply -n "$NAMESPACE" -f "$manifest"
   sleep 3
 done
 
 echo "==> Waiting for jobs to complete"
-for job in \
-  mini-background-training \
-  mini-medium-inference-1 \
-  mini-short-inference-1 \
-  mini-short-inference-2 \
-  mini-short-inference-3
-do
-  kubectl wait -n "$NAMESPACE" --for=condition=complete "job/${job}" --timeout="$WAIT_TIMEOUT"
-done
+kubectl wait -n "$NAMESPACE" --for=condition=complete job -l "$SELECTOR" --timeout="$WAIT_TIMEOUT"
 
 echo "Mini benchmark run completed successfully."

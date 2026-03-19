@@ -18,7 +18,7 @@ spec:
       annotations:
         external-scheduler.hami.io/enabled: "true"
         external-scheduler.hami.io/class: throughput
-        external-scheduler.hami.io/runtime-seconds: "60"
+        external-scheduler.hami.io/runtime-seconds: "80"
         external-scheduler.hami.io/gpu-mem-mib: "1800"
     spec:
       schedulingGates:
@@ -33,7 +33,7 @@ spec:
             - name: WORKLOAD_KIND
               value: medium-inference
             - name: WORKLOAD_RUNTIME_SECONDS
-              value: "60"
+              value: "80"
             - name: WORKLOAD_RESERVE_MIB
               value: "1200"
             - name: WORKLOAD_BATCH_SIZE

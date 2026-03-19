@@ -1,10 +1,10 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: mini-short-inference-2
+  name: mini-short-inference-4
   labels:
     benchmark.hami.io/plan: mini
-    benchmark.hami.io/mode: external
+    benchmark.hami.io/mode: hami-only
     benchmark.hami.io/workload: short-inference
 spec:
   backoffLimit: 0
@@ -13,16 +13,9 @@ spec:
     metadata:
       labels:
         benchmark.hami.io/plan: mini
-        benchmark.hami.io/mode: external
+        benchmark.hami.io/mode: hami-only
         benchmark.hami.io/workload: short-inference
-      annotations:
-        external-scheduler.hami.io/enabled: "true"
-        external-scheduler.hami.io/class: latency-sensitive
-        external-scheduler.hami.io/runtime-seconds: "30"
-        external-scheduler.hami.io/gpu-mem-mib: "800"
     spec:
-      schedulingGates:
-        - name: external-scheduler.hami.io/admission
       restartPolicy: Never
       containers:
         - name: worker

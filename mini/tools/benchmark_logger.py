@@ -136,6 +136,8 @@ def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_tot
     completed_runtime = []
     queue_delay = []
     pod_summaries = []
+    benchmark_start = None
+    benchmark_finish = None
 
     for item in pods_json.get("items", []):
         meta = item.get("metadata", {})
@@ -158,6 +160,10 @@ def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_tot
         if creation and finished:
             elapsed_seconds = (finished - creation).total_seconds()
             completed_elapsed.append(elapsed_seconds)
+            if benchmark_start is None or creation < benchmark_start:
+                benchmark_start = creation
+            if benchmark_finish is None or finished > benchmark_finish:
+                benchmark_finish = finished
         if start and finished:
             runtime_seconds = (finished - start).total_seconds()
             completed_runtime.append(runtime_seconds)
@@ -187,6 +193,12 @@ def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_tot
         "job_count": len(jobs_json.get("items", [])),
         "pod_count": len(pods_json.get("items", [])),
         "completed_pod_count": len(completed_elapsed),
+        "total_benchmark_wall_time_seconds": (
+            (benchmark_finish - benchmark_start).total_seconds()
+            if benchmark_start and benchmark_finish
+            else None
+        ),
+        "max_task_completion_time_seconds": max(completed_elapsed) if completed_elapsed else None,
         "average_completion_time_seconds": statistics.mean(completed_elapsed) if completed_elapsed else None,
         "average_runtime_seconds": statistics.mean(completed_runtime) if completed_runtime else None,
         "average_queue_delay_seconds": statistics.mean(queue_delay) if queue_delay else None,
@@ -209,6 +221,8 @@ def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_tot
         f"job_count: {summary['job_count']}",
         f"pod_count: {summary['pod_count']}",
         f"completed_pod_count: {summary['completed_pod_count']}",
+        f"total_benchmark_wall_time_seconds: {summary['total_benchmark_wall_time_seconds']}",
+        f"max_task_completion_time_seconds: {summary['max_task_completion_time_seconds']}",
         f"average_completion_time_seconds: {summary['average_completion_time_seconds']}",
         f"average_runtime_seconds: {summary['average_runtime_seconds']}",
         f"average_queue_delay_seconds: {summary['average_queue_delay_seconds']}",

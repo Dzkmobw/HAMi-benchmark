@@ -18,7 +18,7 @@ spec:
       annotations:
         external-scheduler.hami.io/enabled: "true"
         external-scheduler.hami.io/class: latency-sensitive
-        external-scheduler.hami.io/runtime-seconds: "20"
+        external-scheduler.hami.io/runtime-seconds: "30"
         external-scheduler.hami.io/gpu-mem-mib: "800"
     spec:
       schedulingGates:
@@ -33,7 +33,7 @@ spec:
             - name: WORKLOAD_KIND
               value: short-inference
             - name: WORKLOAD_RUNTIME_SECONDS
-              value: "20"
+              value: "30"
             - name: WORKLOAD_RESERVE_MIB
               value: "400"
             - name: WORKLOAD_BATCH_SIZE

@@ -1,11 +1,11 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: mini-short-inference-2
+  name: mini-medium-inference-2
   labels:
     benchmark.hami.io/plan: mini
-    benchmark.hami.io/mode: external
-    benchmark.hami.io/workload: short-inference
+    benchmark.hami.io/mode: hami-only
+    benchmark.hami.io/workload: medium-inference
 spec:
   backoffLimit: 0
   ttlSecondsAfterFinished: 3600
@@ -13,16 +13,9 @@ spec:
     metadata:
       labels:
         benchmark.hami.io/plan: mini
-        benchmark.hami.io/mode: external
-        benchmark.hami.io/workload: short-inference
-      annotations:
-        external-scheduler.hami.io/enabled: "true"
-        external-scheduler.hami.io/class: latency-sensitive
-        external-scheduler.hami.io/runtime-seconds: "30"
-        external-scheduler.hami.io/gpu-mem-mib: "800"
+        benchmark.hami.io/mode: hami-only
+        benchmark.hami.io/workload: medium-inference
     spec:
-      schedulingGates:
-        - name: external-scheduler.hami.io/admission
       restartPolicy: Never
       containers:
         - name: worker
@@ -31,18 +24,18 @@ spec:
           command: ["python", "/workloads/mini_workload.py"]
           env:
             - name: WORKLOAD_KIND
-              value: short-inference
+              value: medium-inference
             - name: WORKLOAD_RUNTIME_SECONDS
-              value: "30"
+              value: "80"
             - name: WORKLOAD_RESERVE_MIB
-              value: "400"
+              value: "1200"
             - name: WORKLOAD_BATCH_SIZE
-              value: "256"
+              value: "8"
           resources:
             limits:
               nvidia.com/gpu: "1"
-              nvidia.com/gpumem: "800"
-              nvidia.com/gpucores: "10"
+              nvidia.com/gpumem: "1800"
+              nvidia.com/gpucores: "20"
           volumeMounts:
             - name: workloads
               mountPath: /workloads

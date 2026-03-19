@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: mini-short-inference-2
+  name: mini-short-inference-6
   labels:
     benchmark.hami.io/plan: mini
     benchmark.hami.io/mode: external

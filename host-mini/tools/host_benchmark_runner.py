@@ -42,11 +42,16 @@ class TaskResult:
 
 
 TASKS = [
-    TaskSpec("mini-background-training", "background-training", 180, 2200, 64),
-    TaskSpec("mini-medium-inference-1", "medium-inference", 60, 1200, 8),
-    TaskSpec("mini-short-inference-1", "short-inference", 20, 400, 256),
-    TaskSpec("mini-short-inference-2", "short-inference", 20, 400, 256),
-    TaskSpec("mini-short-inference-3", "short-inference", 20, 400, 256),
+    TaskSpec("mini-background-training", "background-training", 150, 2200, 64),
+    TaskSpec("mini-medium-inference-1", "medium-inference", 80, 1200, 8),
+    TaskSpec("mini-medium-inference-2", "medium-inference", 80, 1200, 8),
+    TaskSpec("mini-medium-inference-3", "medium-inference", 80, 1200, 8),
+    TaskSpec("mini-short-inference-1", "short-inference", 30, 400, 256),
+    TaskSpec("mini-short-inference-2", "short-inference", 30, 400, 256),
+    TaskSpec("mini-short-inference-3", "short-inference", 30, 400, 256),
+    TaskSpec("mini-short-inference-4", "short-inference", 30, 400, 256),
+    TaskSpec("mini-short-inference-5", "short-inference", 30, 400, 256),
+    TaskSpec("mini-short-inference-6", "short-inference", 30, 400, 256),
 ]
 
 
@@ -261,6 +266,16 @@ def summarize(log_dir: Path, gpu_total_mib: float, results: list[TaskResult]) ->
     completion_times = [result.completion_time_seconds for result in completed if result.completion_time_seconds is not None]
     runtimes = [result.runtime_seconds for result in completed if result.runtime_seconds is not None]
     queue_delays = [result.queue_delay_seconds for result in completed if result.queue_delay_seconds is not None]
+    submitted_times = [
+        datetime.fromisoformat(result.submitted_at)
+        for result in completed
+        if result.submitted_at is not None
+    ]
+    finish_times = [
+        datetime.fromisoformat(result.finish_at)
+        for result in completed
+        if result.finish_at is not None
+    ]
 
     summary = {
         "mode": "host-direct",
@@ -268,6 +283,12 @@ def summarize(log_dir: Path, gpu_total_mib: float, results: list[TaskResult]) ->
         "gpu_total_mib": gpu_total_mib,
         "task_count": len(results),
         "completed_task_count": len(completed),
+        "total_benchmark_wall_time_seconds": (
+            (max(finish_times) - min(submitted_times)).total_seconds()
+            if submitted_times and finish_times
+            else None
+        ),
+        "max_task_completion_time_seconds": max(completion_times) if completion_times else None,
         "average_completion_time_seconds": statistics.mean(completion_times) if completion_times else None,
         "average_runtime_seconds": statistics.mean(runtimes) if runtimes else None,
         "average_queue_delay_seconds": statistics.mean(queue_delays) if queue_delays else None,
@@ -287,6 +308,8 @@ def summarize(log_dir: Path, gpu_total_mib: float, results: list[TaskResult]) ->
         f"gpu_total_mib: {gpu_total_mib}",
         f"task_count: {summary['task_count']}",
         f"completed_task_count: {summary['completed_task_count']}",
+        f"total_benchmark_wall_time_seconds: {summary['total_benchmark_wall_time_seconds']}",
+        f"max_task_completion_time_seconds: {summary['max_task_completion_time_seconds']}",
         f"average_completion_time_seconds: {summary['average_completion_time_seconds']}",
         f"average_runtime_seconds: {summary['average_runtime_seconds']}",
         f"average_queue_delay_seconds: {summary['average_queue_delay_seconds']}",
