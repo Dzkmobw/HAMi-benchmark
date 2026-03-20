@@ -237,7 +237,3 @@ K8s mini benchmark 的日志目录在：
 ```bash
 /home/ttk/project/HAMi-benchmark/host-mini/run-host-mini
 ```
-
-一句话总结：
-
-这个仓库是一个专门用于评估 HAMi 与 external scheduler 在单卡混合负载下调度表现的 benchmark 仓库。
