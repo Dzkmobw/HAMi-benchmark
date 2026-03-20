@@ -1,161 +1,243 @@
-# Benchmark Plan
+# HAMi Benchmark
 
-This directory defines the benchmark content for the external scheduler.
+这个仓库用于比较三种运行模式在单卡混合负载下的表现：
 
-Target metrics:
+- `HAMi only`
+- `HAMi + external scheduler`
+- `host-direct baseline`
 
-- average job completion time
-- GPU utilization
-- GPU memory utilization
+它不是通用机器学习 benchmark，而是一个调度评估仓库。
+关注的核心指标是：
 
-## Why this benchmark
+- 平均任务完成时间
+- GPU 利用率
+- 显存利用率
 
-For a single RTX 4070 SUPER, the external scheduler is most likely to beat
-default HAMi behavior under mixed workloads, not under one exclusive job.
+一、怎么用
 
-So the benchmark uses a mixed queue with three workload classes:
+运行前默认假设：
 
-- short-inference
-- medium-inference
-- background-training
+- HAMi 源码位于：
+  - `/home/ttk/project/HAMi`
+- external scheduler 位于：
+  - `/home/ttk/project/HAMi-external-scheduler`
+- 当前仓库位于：
+  - `/home/ttk/project/HAMi-benchmark`
 
-This stresses:
+如果要跑 K8s 模式，要求：
 
-- queue ordering
-- admission timing
-- memory-aware co-location
-- interference control
+- `minikube` 可用
+- HAMi 已启动
+- 如果跑 external 模式，external controller 已启动
 
-## Plans
+运行 HAMi-only：
 
-Two plans are defined:
+```bash
+/home/ttk/project/HAMi-benchmark/mini/run-mini-hami-only
+```
 
-- `benchmark-plan-mini.yaml`
-  - quick validation round
-  - expected duration: 3 to 6 minutes
-- `benchmark-plan.yaml`
-  - normal comparison round
-  - expected duration: 10 to 20 minutes
+运行 external：
 
-`benchmark-plan.yaml` is the current full-round plan.
+```bash
+/home/ttk/project/HAMi-benchmark/mini/run-mini-external
+```
 
-## Selected workload mix
+清理 benchmark 资源：
 
-The benchmark mix for one round is:
+```bash
+/home/ttk/project/HAMi-benchmark/mini/cleanup-mini
+```
 
-- 7 short-inference jobs
-- 2 medium-inference jobs
-- 1 background-training job
+运行宿主机 baseline：
 
-This is a 70 / 20 / 10 mix.
+```bash
+/home/ttk/project/HAMi-benchmark/host-mini/run-host-mini
+```
 
-## Workload classes
+二、项目有什么功能
 
-### 1. short-inference
+这个仓库主要提供四类能力。
 
-Purpose:
+第一类是 benchmark 计划定义。
+在这里：
 
-- improve average completion time
-- keep GPU busy with short jobs
+- [`benchmark-plan.yaml`](/home/ttk/project/HAMi-benchmark/benchmark-plan.yaml)
+- [`benchmark-plan-mini.yaml`](/home/ttk/project/HAMi-benchmark/benchmark-plan-mini.yaml)
 
-Recommended real task:
+它们负责描述测试目标、对比模式和负载设计思路。
 
-- sentence embedding inference
-- or OCR single-image inference
+第二类是可运行的 K8s benchmark。
+在这里：
 
-Recommended scheduler metadata:
+- [`mini/`](/home/ttk/project/HAMi-benchmark/mini)
 
-- class: latency-sensitive
-- runtime-seconds: 20 to 40
-- gpu-mem-mib: 800 to 1200
+这一部分会真正提交 Job、采样指标并生成 summary。
 
-Recommended HAMi resources:
+第三类是宿主机 baseline。
+在这里：
 
-- nvidia.com/gpu: 1
-- nvidia.com/gpumem: 1000
-- nvidia.com/gpucores: 20
+- [`host-mini/`](/home/ttk/project/HAMi-benchmark/host-mini)
 
-### 2. medium-inference
+它用于提供一个不经过 K8s、不经过 HAMi 的参考基线。
 
-Purpose:
+第四类是自动日志和结果汇总。
+每次 benchmark 结束后，都会自动生成：
 
-- improve GPU utilization and memory utilization
-- create contention that the scheduler can manage
+- `run.log`
+- `metrics_samples.csv`
+- `summary.json`
+- `summary.txt`
 
-Recommended real task:
+在 K8s 模式下通常还会有：
 
-- YOLOv8n image inference
-- or small batched vision inference
+- `pods.json`
+- `jobs.json`
 
-Recommended scheduler metadata:
+在 host 模式下通常会有：
 
-- class: throughput
-- runtime-seconds: 60 to 120
-- gpu-mem-mib: 1800 to 2600
+- `tasks.json`
 
-Recommended HAMi resources:
+三、目录和模块说明
 
-- nvidia.com/gpu: 1
-- nvidia.com/gpumem: 2200
-- nvidia.com/gpucores: 35
+[`benchmark-plan.yaml`](/home/ttk/project/HAMi-benchmark/benchmark-plan.yaml)
 
-### 3. background-training
+- 完整 round 的概念设计文件
+- 更偏设计说明，不是直接运行入口
 
-Purpose:
+[`benchmark-plan-mini.yaml`](/home/ttk/project/HAMi-benchmark/benchmark-plan-mini.yaml)
 
-- create long-running interference
-- test whether short jobs can still complete faster
+- mini round 的概念设计文件
+- 用来描述快速验证方案
 
-Recommended real task:
+[`mini/`](/home/ttk/project/HAMi-benchmark/mini)
 
-- CIFAR10 ResNet18 training
-- or a small LoRA / fine-tuning loop
+- 主 K8s benchmark 目录
+- 包含 manifests、运行脚本、采样与汇总脚本
 
-Recommended scheduler metadata:
+[`mini/workloads/mini_workload.py`](/home/ttk/project/HAMi-benchmark/mini/workloads/mini_workload.py)
 
-- class: background
-- runtime-seconds: 300 to 900
-- gpu-mem-mib: 3500 to 5000
+- 所有 mini 任务共用的 Python workload 入口
+- benchmark 真正执行的 GPU workload 在这里
 
-Recommended HAMi resources:
+[`mini/manifests/hami-only`](/home/ttk/project/HAMi-benchmark/mini/manifests/hami-only)
 
-- nvidia.com/gpu: 1
-- nvidia.com/gpumem: 4000
-- nvidia.com/gpucores: 45
+- plain HAMi 模式的 Job manifests
 
-## Round definition
+[`mini/manifests/external`](/home/ttk/project/HAMi-benchmark/mini/manifests/external)
 
-One benchmark round should follow this submission pattern:
+- external scheduler 模式的 Job manifests
 
-1. submit 1 background-training job
-2. submit 2 medium-inference jobs
-3. submit 7 short-inference jobs
+[`mini/run-mini-common`](/home/ttk/project/HAMi-benchmark/mini/run-mini-common)
 
-The jobs should be submitted within a short arrival window, for example
-10 to 30 seconds, so that queueing decisions matter.
+- 两种 K8s 模式共用的执行器
+- 负责建 namespace、刷新 ConfigMap、提交流程、等待完成、写 summary
 
-## Comparison modes
+[`mini/run-mini-hami-only`](/home/ttk/project/HAMi-benchmark/mini/run-mini-hami-only)
 
-Run exactly the same job mix in two modes:
+- HAMi-only 入口
 
-1. HAMi only
-2. HAMi + external scheduler
+[`mini/run-mini-external`](/home/ttk/project/HAMi-benchmark/mini/run-mini-external)
 
-## Success criteria
+- external 模式入口
 
-The external scheduler is considered better if it achieves:
+[`mini/cleanup-mini`](/home/ttk/project/HAMi-benchmark/mini/cleanup-mini)
 
-- lower average job completion time
-- higher average GPU utilization
-- higher average GPU memory utilization
+- 清理 mini benchmark 资源
 
-while keeping:
+[`mini/tools/benchmark_logger.py`](/home/ttk/project/HAMi-benchmark/mini/tools/benchmark_logger.py)
 
-- no extra OOM
-- no deadlocked queued jobs
+- 负责指标采样和 summary 汇总
+- 这是结果统计的关键文件
 
-## Notes
+[`host-mini/`](/home/ttk/project/HAMi-benchmark/host-mini)
 
-- Use real deep learning tasks, not sleep-only containers.
-- Keep image, dataset, batch size, and submission order identical between runs.
-- Use the same measurement window for both modes.
+- 宿主机 baseline 目录
+
+[`host-mini/tools/host_benchmark_runner.py`](/home/ttk/project/HAMi-benchmark/host-mini/tools/host_benchmark_runner.py)
+
+- host baseline 的主执行器
+- 用 `docker run --gpus all` 跑任务
+- 用 `nvidia-smi` 采样 GPU 指标
+
+[`host-mini/run-host-mini`](/home/ttk/project/HAMi-benchmark/host-mini/run-host-mini)
+
+- 宿主机 baseline 的入口脚本
+
+四、日志输出在哪里
+
+K8s mini benchmark 的日志目录在：
+
+- [`mini/logs`](/home/ttk/project/HAMi-benchmark/mini/logs)
+
+宿主机 baseline 的日志目录在：
+
+- [`host-mini/logs`](/home/ttk/project/HAMi-benchmark/host-mini/logs)
+
+每一轮 benchmark 都会生成一个带时间戳的目录。
+最常看的通常是：
+
+- `summary.txt`
+- `summary.json`
+- `run.log`
+- `metrics_samples.csv`
+
+五、当前已知注意事项
+
+第一，概念 plan 和当前 runnable 版本不一定完全一致。
+如果你在改 benchmark，真正应该优先看的不是高层计划说明，而是：
+
+- `mini/manifests/`
+- `host-mini/tools/host_benchmark_runner.py`
+
+第二，结果会明显受 HAMi 的 node lock 配置影响。
+当前默认假设是 HAMi 以 `30s` 的 node lock timeout 运行。
+
+第三，external scheduler 是否“工作正常”和它是否“比 HAMi-only 更强”不是一回事。
+这个仓库既用于验证链路能不能跑，也用于验证策略到底有没有带来收益。
+
+六、推荐阅读顺序
+
+如果第一次接手这个仓库，建议按下面顺序读：
+
+1. `README.md`
+2. `benchmark-plan.yaml`
+3. `mini/run-mini-common`
+4. `mini/tools/benchmark_logger.py`
+5. `mini/workloads/mini_workload.py`
+6. `host-mini/tools/host_benchmark_runner.py`
+
+这样最快能理解：
+
+- benchmark 目标
+- benchmark 怎么跑
+- 指标是怎么采样和汇总的
+
+七、最常用命令
+
+清理：
+
+```bash
+/home/ttk/project/HAMi-benchmark/mini/cleanup-mini
+```
+
+跑 HAMi-only：
+
+```bash
+/home/ttk/project/HAMi-benchmark/mini/run-mini-hami-only
+```
+
+跑 external：
+
+```bash
+/home/ttk/project/HAMi-benchmark/mini/run-mini-external
+```
+
+跑 host baseline：
+
+```bash
+/home/ttk/project/HAMi-benchmark/host-mini/run-host-mini
+```
+
+一句话总结：
+
+这个仓库是一个专门用于评估 HAMi 与 external scheduler 在单卡混合负载下调度表现的 benchmark 仓库。
