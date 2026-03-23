@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+import csv
+import hashlib
 import json
 import math
 import os
+import re
 import time
 import traceback
+import urllib.request
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
+from torchvision import transforms
 
 
 def get_env_int(name: str, default: int) -> int:
@@ -44,6 +50,12 @@ def emit_intercept_log() -> None:
         print("CUDA_INTERCEPT_LOG_END", flush=True)
     except Exception as exc:  # noqa: BLE001
         print(f"CUDA_INTERCEPT_LOG_ERROR:{exc}", flush=True)
+
+
+def get_data_root() -> str:
+    data_root = get_env_str("WORKLOAD_DATA_ROOT", "/tmp/hami-benchmark-data").strip() or "/tmp/hami-benchmark-data"
+    os.makedirs(data_root, exist_ok=True)
+    return data_root
 
 
 def emit_training_epoch_metric(
@@ -82,88 +94,179 @@ def emit_training_epoch_metric(
     )
 
 
-def build_synthetic_class_templates(device: torch.device) -> torch.Tensor:
-    templates = torch.zeros(10, 3, 64, 64, device=device)
-    patch_size = 12
-    accent_size = 8
-    row_positions = [6, 24, 42]
-    col_positions = [4, 16, 28, 40, 52]
-    for class_id in range(10):
-        row = row_positions[class_id // 5]
-        col = col_positions[class_id % 5]
-        primary_channel = class_id % 3
-        accent_channel = (class_id + 1) % 3
-        templates[class_id, primary_channel, row : row + patch_size, col - 4 : col + 8] = 1.0
-        templates[class_id, accent_channel, row // 2 : row // 2 + accent_size, col - 2 : col + 6] = 0.45
-        templates[class_id, :, row + patch_size : row + patch_size + 2, :] = class_id / 20.0
-    return templates
+def download_file(url: str, destination: str) -> None:
+    os.makedirs(os.path.dirname(destination), exist_ok=True)
+    if os.path.exists(destination):
+        return
+    urllib.request.urlretrieve(url, destination)
 
 
-def synthetic_training_batch(
-    batch_size: int,
-    device: torch.device,
-    class_templates: torch.Tensor,
-    noise_scale: float,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    labels = torch.randint(0, class_templates.shape[0], (batch_size,), device=device)
-    images = class_templates.index_select(0, labels).clone()
-    images.add_(torch.randn(batch_size, 3, 64, 64, device=device) * noise_scale)
-    return images, labels
+def stable_token_id(token: str, vocab_size: int = 50000) -> int:
+    digest = hashlib.blake2b(token.encode("utf-8"), digest_size=4).digest()
+    return int.from_bytes(digest, "little") % (vocab_size - 1) + 1
+
+
+def tokenize_text(text: str, max_tokens: int = 96) -> list[int]:
+    tokens = re.findall(r"[a-z0-9']+", text.lower())
+    token_ids = [stable_token_id(token) for token in tokens[:max_tokens]]
+    return token_ids or [0]
+
+
+def load_ag_news_sequences(data_root: str) -> list[list[int]]:
+    dataset_dir = os.path.join(data_root, "ag_news")
+    dataset_path = os.path.join(dataset_dir, "test.csv")
+    download_file(
+        "https://raw.githubusercontent.com/mhjabreel/CharCNN_Keras/master/data/ag_news_csv/test.csv",
+        dataset_path,
+    )
+
+    sequences: list[list[int]] = []
+    max_samples = get_env_int("WORKLOAD_TEXT_MAX_SAMPLES", 20000)
+    with open(dataset_path, "r", encoding="utf-8", newline="") as fh:
+        reader = csv.reader(fh)
+        for index, row in enumerate(reader):
+            if index >= max_samples:
+                break
+            if len(row) < 3:
+                continue
+            title = row[1].strip()
+            description = row[2].strip()
+            sequences.append(tokenize_text(f"{title}. {description}"))
+    if not sequences:
+        raise RuntimeError(f"no AG News text samples loaded from {dataset_path}")
+    return sequences
+
+
+def sample_text_batch(sequences: list[list[int]], batch_size: int, device: torch.device) -> tuple[torch.Tensor, torch.Tensor]:
+    max_tokens = get_env_int("WORKLOAD_TEXT_SEQ_LEN", 128)
+    selected = [sequences[index] for index in torch.randint(0, len(sequences), (batch_size,)).tolist()]
+    tokens = torch.zeros((batch_size, max_tokens), device=device, dtype=torch.long)
+    attention_mask = torch.zeros((batch_size, max_tokens), device=device, dtype=torch.bool)
+    for row_index, sequence in enumerate(selected):
+        sequence_slice = sequence[:max_tokens]
+        sequence_length = len(sequence_slice)
+        if sequence_length <= 0:
+            continue
+        tokens[row_index, :sequence_length] = torch.tensor(sequence_slice, device=device, dtype=torch.long)
+        attention_mask[row_index, :sequence_length] = True
+    return tokens, attention_mask
+
+
+def build_cifar10_dataset(data_root: str, train: bool, image_size: int, augment: bool) -> torch.utils.data.Dataset:
+    dataset_root = os.path.join(data_root, "cifar10")
+    transform_steps: list[transforms.Compose | transforms.Normalize | transforms.ToTensor | transforms.Resize] = []
+    if augment:
+        transform_steps.extend(
+            [
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+            ]
+        )
+    if image_size != 32:
+        transform_steps.append(transforms.Resize((image_size, image_size)))
+    transform_steps.extend(
+        [
+            transforms.ToTensor(),
+            transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ]
+    )
+    return torchvision.datasets.CIFAR10(
+        root=dataset_root,
+        train=train,
+        download=True,
+        transform=transforms.Compose(transform_steps),
+    )
+
+
+def infinite_loader(loader: torch.utils.data.DataLoader) -> torch.Tensor:
+    while True:
+        for batch in loader:
+            yield batch
+
+
+def build_dataloader(dataset: torch.utils.data.Dataset, batch_size: int, shuffle: bool) -> torch.utils.data.DataLoader:
+    num_workers = max(0, get_env_int("WORKLOAD_DATALOADER_WORKERS", 4))
+    return torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+        persistent_workers=num_workers > 0,
+        drop_last=True,
+    )
+
+
+def build_resnet18(num_classes: int = 1000, use_pretrained: bool = True) -> nn.Module:
+    weights = None
+    if use_pretrained:
+        try:
+            weights = torchvision.models.ResNet18_Weights.DEFAULT
+        except Exception:
+            weights = None
+    model = torchvision.models.resnet18(weights=weights)
+    if num_classes != 1000:
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+    return model
 
 
 class TextEmbeddingModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.embedding = nn.Embedding(32000, 256)
-        self.proj = nn.Sequential(
-            nn.Linear(256, 512),
+        vocab_size = get_env_int("WORKLOAD_TEXT_VOCAB_SIZE", 50000)
+        model_dim = get_env_int("WORKLOAD_TEXT_MODEL_DIM", 512)
+        num_heads = get_env_int("WORKLOAD_TEXT_HEADS", 8)
+        num_layers = get_env_int("WORKLOAD_TEXT_LAYERS", 4)
+        max_tokens = get_env_int("WORKLOAD_TEXT_SEQ_LEN", 128)
+        ff_dim = get_env_int("WORKLOAD_TEXT_FF_DIM", model_dim * 4)
+
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=model_dim,
+            nhead=num_heads,
+            dim_feedforward=ff_dim,
+            dropout=0.1,
+            batch_first=True,
+            activation="gelu",
+        )
+        self.token_embedding = nn.Embedding(vocab_size, model_dim, padding_idx=0)
+        self.position_embedding = nn.Embedding(max_tokens, model_dim)
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.norm = nn.LayerNorm(model_dim)
+        self.projection = nn.Sequential(
+            nn.Linear(model_dim, model_dim),
             nn.GELU(),
-            nn.Linear(512, 384),
+            nn.Linear(model_dim, model_dim),
         )
 
-    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
-        pooled = self.embedding(tokens).mean(dim=1)
-        return self.proj(pooled)
+    def forward(self, tokens: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+        positions = torch.arange(tokens.size(1), device=tokens.device).unsqueeze(0)
+        hidden = self.token_embedding(tokens) + self.position_embedding(positions)
+        hidden = self.encoder(hidden, src_key_padding_mask=~attention_mask)
+        mask = attention_mask.unsqueeze(-1)
+        pooled = (hidden * mask).sum(dim=1) / mask.sum(dim=1).clamp_min(1)
+        return self.projection(self.norm(pooled))
 
 
 class VisionInferenceModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool2d((1, 1)),
-        )
-        self.head = nn.Linear(128, 1000)
+        self.model = build_resnet18(num_classes=1000, use_pretrained=get_env_int("WORKLOAD_USE_PRETRAINED_VISION", 0) == 1)
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
-        x = self.net(images).flatten(1)
-        return self.head(x)
+        return self.model(images)
 
 
 class TrainModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool2d((1, 1)),
-        )
-        self.head = nn.Linear(128, 10)
+        use_pretrained = get_env_int("WORKLOAD_USE_PRETRAINED_VISION", 0) == 1
+        self.model = build_resnet18(num_classes=10, use_pretrained=use_pretrained)
+        if use_pretrained:
+            for name, parameter in self.model.named_parameters():
+                parameter.requires_grad = name.startswith("fc.")
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
-        x = self.net(images).flatten(1)
-        return self.head(x)
+        return self.model(images)
 
 
 def build_result(
@@ -194,15 +297,17 @@ def build_result(
 
 
 def text_embedding_inference(device: torch.device, runtime_seconds: int, reserve_mib: int, batch_size: int, task_name: str, priority_tier: str) -> dict:
+    data_root = get_data_root()
     model = TextEmbeddingModel().to(device).eval()
+    sequences = load_ag_news_sequences(data_root)
     _buffer = maybe_reserve_memory(device, reserve_mib)
     started = time.monotonic()
     batches = 0
     processed = 0
     with torch.inference_mode():
         while time.monotonic() - started < runtime_seconds:
-            tokens = torch.randint(0, 32000, (batch_size, 64), device=device)
-            _ = model(tokens)
+            tokens, attention_mask = sample_text_batch(sequences, batch_size, device)
+            _ = model(tokens, attention_mask)
             if device.type == "cuda":
                 torch.cuda.synchronize()
             batches += 1
@@ -211,14 +316,19 @@ def text_embedding_inference(device: torch.device, runtime_seconds: int, reserve
 
 
 def vision_inference(device: torch.device, runtime_seconds: int, reserve_mib: int, batch_size: int, task_name: str, priority_tier: str) -> dict:
+    data_root = get_data_root()
     model = VisionInferenceModel().to(device).eval()
+    dataset = build_cifar10_dataset(data_root=data_root, train=False, image_size=get_env_int("WORKLOAD_VISION_IMAGE_SIZE", 320), augment=False)
+    loader = build_dataloader(dataset, batch_size=batch_size, shuffle=True)
+    batches_iter = infinite_loader(loader)
     _buffer = maybe_reserve_memory(device, reserve_mib)
     started = time.monotonic()
     batches = 0
     processed = 0
     with torch.inference_mode():
         while time.monotonic() - started < runtime_seconds:
-            images = torch.randn(batch_size, 3, 224, 224, device=device)
+            images, _labels = next(batches_iter)
+            images = images.to(device, non_blocking=True)
             _ = model(images)
             if device.type == "cuda":
                 torch.cuda.synchronize()
@@ -228,12 +338,19 @@ def vision_inference(device: torch.device, runtime_seconds: int, reserve_mib: in
 
 
 def background_cnn_training(device: torch.device, runtime_seconds: int, reserve_mib: int, batch_size: int, task_name: str, priority_tier: str) -> dict:
+    data_root = get_data_root()
     model = TrainModel().to(device).train()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-4)
+    optimizer = torch.optim.AdamW((parameter for parameter in model.parameters() if parameter.requires_grad), lr=1e-3)
+    dataset = build_cifar10_dataset(
+        data_root=data_root,
+        train=True,
+        image_size=get_env_int("WORKLOAD_TRAIN_IMAGE_SIZE", 224),
+        augment=True,
+    )
+    loader = build_dataloader(dataset, batch_size=batch_size, shuffle=True)
+    batches_iter = infinite_loader(loader)
     _buffer = maybe_reserve_memory(device, reserve_mib)
-    class_templates = build_synthetic_class_templates(device)
-    noise_scale = get_env_float("WORKLOAD_TRAIN_NOISE_SCALE", 0.08)
-    samples_per_epoch = get_env_int("WORKLOAD_TRAIN_SAMPLES_PER_EPOCH", 2048)
+    samples_per_epoch = get_env_int("WORKLOAD_TRAIN_SAMPLES_PER_EPOCH", 4096)
     batches_per_epoch = max(1, math.ceil(samples_per_epoch / max(batch_size, 1)))
     started = time.monotonic()
     batches = 0
@@ -246,7 +363,9 @@ def background_cnn_training(device: torch.device, runtime_seconds: int, reserve_
     epoch_loss_total = 0.0
     epoch_accuracy_total = 0.0
     while time.monotonic() - started < runtime_seconds:
-        images, labels = synthetic_training_batch(batch_size, device, class_templates, noise_scale)
+        images, labels = next(batches_iter)
+        images = images.to(device, non_blocking=True)
+        labels = labels.to(device, non_blocking=True)
         optimizer.zero_grad(set_to_none=True)
         logits = model(images)
         loss = F.cross_entropy(logits, labels)
@@ -300,6 +419,28 @@ def background_cnn_training(device: torch.device, runtime_seconds: int, reserve_
     )
 
 
+def prepare_assets(device: torch.device, runtime_seconds: int, reserve_mib: int, batch_size: int, task_name: str, priority_tier: str) -> dict:
+    del device, runtime_seconds, reserve_mib, batch_size
+    data_root = get_data_root()
+    started = time.monotonic()
+    sequences = load_ag_news_sequences(data_root)
+    cifar_train = build_cifar10_dataset(data_root=data_root, train=True, image_size=32, augment=False)
+    cifar_test = build_cifar10_dataset(data_root=data_root, train=False, image_size=32, augment=False)
+    if get_env_int("WORKLOAD_USE_PRETRAINED_VISION", 1) == 1:
+        _vision_model = build_resnet18(num_classes=1000, use_pretrained=True)
+    result = build_result(
+        "prepare-assets",
+        task_name,
+        priority_tier,
+        0,
+        1,
+        len(sequences) + len(cifar_train) + len(cifar_test),
+        started,
+    )
+    result["prepared_data_root"] = data_root
+    return result
+
+
 def main() -> int:
     workload_kind = get_env_str("WORKLOAD_KIND", "text-embedding-inference")
     runtime_seconds = get_env_int("WORKLOAD_RUNTIME_SECONDS", 30)
@@ -330,6 +471,8 @@ def main() -> int:
             result = vision_inference(device, runtime_seconds, reserve_mib, batch_size, task_name, priority_tier)
         elif workload_kind == "background-cnn-training":
             result = background_cnn_training(device, runtime_seconds, reserve_mib, batch_size, task_name, priority_tier)
+        elif workload_kind == "prepare-assets":
+            result = prepare_assets(device, runtime_seconds, reserve_mib, batch_size, task_name, priority_tier)
         else:
             raise ValueError(f"unsupported workload kind: {workload_kind}")
 

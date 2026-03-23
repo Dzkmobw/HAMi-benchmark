@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NAMESPACE="${NAMESPACE:-hami-benchmark-thesis}"
+CONFIGMAP_NAME="${CONFIGMAP_NAME:-hami-benchmark-thesis-workloads}"
+JOB_NAME="${JOB_NAME:-thesis-prepare-assets}"
+PROFILE="${PROFILE:-minikube}"
+HOST_ASSET_ROOT="${HOST_ASSET_ROOT:-/mnt/data/benchmark-data}"
+NODE_ASSET_ROOT="${NODE_ASSET_ROOT:-/var/lib/hami-benchmark-data}"
+
+sync_host_assets_into_minikube() {
+  local archive_path
+
+  if [[ ! -d "$HOST_ASSET_ROOT" ]]; then
+    echo "==> Host asset cache $HOST_ASSET_ROOT not found; skipping copy"
+    return 0
+  fi
+
+  if [[ -z "$(find "$HOST_ASSET_ROOT" -mindepth 1 -maxdepth 1 2>/dev/null | head -n 1)" ]]; then
+    echo "==> Host asset cache $HOST_ASSET_ROOT is empty; skipping copy"
+    return 0
+  fi
+
+  if ! command -v minikube >/dev/null 2>&1; then
+    echo "==> minikube not found; skipping host-to-minikube asset copy"
+    return 0
+  fi
+
+  if ! minikube -p "$PROFILE" status >/dev/null 2>&1; then
+    echo "==> Minikube profile $PROFILE is not running; skipping host-to-minikube asset copy"
+    return 0
+  fi
+
+  echo "==> Copying cached benchmark assets from $HOST_ASSET_ROOT into minikube:$NODE_ASSET_ROOT"
+  archive_path="$(mktemp /tmp/thesis-assets.XXXXXX.tar)"
+  trap 'rm -f "$archive_path"' RETURN
+
+  tar -C "$HOST_ASSET_ROOT" -cf "$archive_path" .
+  minikube -p "$PROFILE" ssh -- "sudo mkdir -p '$NODE_ASSET_ROOT' && sudo rm -f /tmp/thesis-assets.tar"
+  minikube -p "$PROFILE" cp "$archive_path" /tmp/thesis-assets.tar
+  minikube -p "$PROFILE" ssh -- "sudo tar -C '$NODE_ASSET_ROOT' -xf /tmp/thesis-assets.tar && sudo rm -f /tmp/thesis-assets.tar"
+}
+
+sync_host_assets_into_minikube
+
+kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$NAMESPACE"
+
+kubectl -n "$NAMESPACE" create configmap "$CONFIGMAP_NAME" \
+  --from-file=thesis_workload.py="$ROOT_DIR/workloads/thesis_workload.py" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl delete job -n "$NAMESPACE" "$JOB_NAME" --ignore-not-found=true >/dev/null 2>&1 || true
+
+kubectl apply -n "$NAMESPACE" -f - <<'EOF'
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: thesis-prepare-assets
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: prepare
+          image: hami-cuda-intercept-runtime:local
+          imagePullPolicy: IfNotPresent
+          command: ["python", "/workloads/thesis_workload.py"]
+          env:
+            - name: WORKLOAD_KIND
+              value: prepare-assets
+            - name: WORKLOAD_TASK_NAME
+              value: thesis-prepare-assets
+            - name: WORKLOAD_PRIORITY_TIER
+              value: maintenance
+            - name: WORKLOAD_DATA_ROOT
+              value: /data
+            - name: TORCH_HOME
+              value: /data/torch-cache
+            - name: WORKLOAD_USE_PRETRAINED_VISION
+              value: "1"
+          volumeMounts:
+            - name: workloads
+              mountPath: /workloads
+            - name: benchmark-data
+              mountPath: /data
+      volumes:
+        - name: workloads
+          configMap:
+            name: hami-benchmark-thesis-workloads
+        - name: benchmark-data
+          hostPath:
+            path: /var/lib/hami-benchmark-data
+            type: DirectoryOrCreate
+EOF
+
+kubectl wait --for=condition=complete -n "$NAMESPACE" "job/$JOB_NAME" --timeout=30m
+kubectl logs -n "$NAMESPACE" "job/$JOB_NAME"

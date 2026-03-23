@@ -18,6 +18,7 @@ STOP = False
 IMAGE = "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime"
 WORKLOAD_PATH = Path("/home/ttk/project/HAMi-benchmark/thesis/workloads/thesis_workload.py")
 TRAINING_ACCURACY_THRESHOLD = float(os.environ.get("TRAINING_ACCURACY_THRESHOLD", "0.5"))
+WORKLOAD_DATA_ROOT_HOST = Path(os.environ.get("WORKLOAD_DATA_ROOT_HOST", "/mnt/data/benchmark-data"))
 
 
 @dataclass
@@ -49,10 +50,10 @@ class TaskResult:
 
 
 TASKS = [
-    TaskSpec("thesis-background-cnn-training", "background-cnn-training", 120, 2500, 64, "opportunistic", 0),
-    TaskSpec("thesis-text-embedding-inference-1", "text-embedding-inference", 25, 700, 256, "production", 15),
-    TaskSpec("thesis-vision-inference-1", "vision-inference", 45, 1500, 16, "production", 30),
-    TaskSpec("thesis-text-embedding-inference-2", "text-embedding-inference", 25, 700, 256, "production", 45),
+    TaskSpec("thesis-background-cnn-training", "background-cnn-training", 120, 3200, 96, "opportunistic", 0),
+    TaskSpec("thesis-text-embedding-inference-1", "text-embedding-inference", 25, 1000, 128, "production", 15),
+    TaskSpec("thesis-vision-inference-1", "vision-inference", 45, 1800, 48, "production", 30),
+    TaskSpec("thesis-text-embedding-inference-2", "text-embedding-inference", 25, 1000, 128, "production", 45),
 ]
 
 
@@ -123,6 +124,8 @@ def docker_command(task: TaskSpec) -> list[str]:
         "--rm",
         "--gpus",
         "all",
+        "--shm-size",
+        "2g",
         "-e",
         f"WORKLOAD_TASK_NAME={task.name}",
         "-e",
@@ -135,8 +138,16 @@ def docker_command(task: TaskSpec) -> list[str]:
         f"WORKLOAD_RESERVE_MIB={task.reserve_mib}",
         "-e",
         f"WORKLOAD_BATCH_SIZE={task.batch_size}",
+        "-e",
+        "WORKLOAD_DATA_ROOT=/data",
+        "-e",
+        "TORCH_HOME=/data/torch-cache",
+        "-e",
+        "WORKLOAD_USE_PRETRAINED_VISION=1",
         "-v",
         f"{workload_dir}:/workloads:ro",
+        "-v",
+        f"{WORKLOAD_DATA_ROOT_HOST}:/data",
         IMAGE,
         "python",
         "/workloads/thesis_workload.py",
@@ -192,6 +203,8 @@ def time_to_accuracy_threshold(epoch_metrics: list[dict], threshold: float) -> f
 def run_benchmark() -> int:
     require_command("docker")
     require_nvidia_smi()
+    WORKLOAD_DATA_ROOT_HOST.mkdir(parents=True, exist_ok=True)
+    (WORKLOAD_DATA_ROOT_HOST / "torch-cache").mkdir(parents=True, exist_ok=True)
 
     root_dir = Path(__file__).resolve().parents[1]
     log_dir = root_dir / "logs" / f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-host-direct"

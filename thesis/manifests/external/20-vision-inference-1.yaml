@@ -45,22 +45,40 @@ spec:
             - name: WORKLOAD_RUNTIME_SECONDS
               value: "45"
             - name: WORKLOAD_RESERVE_MIB
-              value: "1500"
+              value: "1800"
             - name: WORKLOAD_BATCH_SIZE
-              value: "16"
+              value: "48"
+            - name: WORKLOAD_DATA_ROOT
+              value: /data
+            - name: TORCH_HOME
+              value: /data/torch-cache
+            - name: WORKLOAD_USE_PRETRAINED_VISION
+              value: "1"
           resources:
             requests:
               nvidia.com/gpu: "1"
-              nvidia.com/gpumem: "1800"
-              nvidia.com/gpucores: "24"
+              nvidia.com/gpumem: "2800"
+              nvidia.com/gpucores: "20"
             limits:
               nvidia.com/gpu: "1"
-              nvidia.com/gpumem: "1800"
-              nvidia.com/gpucores: "24"
+              nvidia.com/gpumem: "2800"
+              nvidia.com/gpucores: "20"
           volumeMounts:
             - name: workloads
               mountPath: /workloads
+            - name: benchmark-data
+              mountPath: /data
+            - name: dshm
+              mountPath: /dev/shm
       volumes:
         - name: workloads
           configMap:
             name: hami-benchmark-thesis-workloads
+        - name: benchmark-data
+          hostPath:
+            path: /var/lib/hami-benchmark-data
+            type: DirectoryOrCreate
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi

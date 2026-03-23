@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DATA_ROOT_HOST="${WORKLOAD_DATA_ROOT_HOST:-/mnt/data/benchmark-data}"
+
+mkdir -p "$DATA_ROOT_HOST"
+
+exec docker run --rm \
+  -e WORKLOAD_KIND=prepare-assets \
+  -e WORKLOAD_TASK_NAME=prepare-host-assets \
+  -e WORKLOAD_PRIORITY_TIER=maintenance \
+  -e WORKLOAD_DATA_ROOT=/data \
+  -e TORCH_HOME=/data/torch-cache \
+  -e WORKLOAD_USE_PRETRAINED_VISION=1 \
+  -v /home/ttk/project/HAMi-benchmark/thesis/workloads:/workloads:ro \
+  -v "$DATA_ROOT_HOST:/data" \
+  hami-cuda-intercept-runtime:local \
+  python /workloads/thesis_workload.py
