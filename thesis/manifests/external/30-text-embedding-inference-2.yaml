@@ -36,22 +36,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: CUDA_INTERCEPT_MEMORY_LIMIT_MIB
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.annotations['external-scheduler.hami.io/intercept-memory-limit-mib']
-            - name: CUDA_INTERCEPT_KERNEL_DELAY_US
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.annotations['external-scheduler.hami.io/intercept-kernel-delay-us']
-            - name: CUDA_INTERCEPT_PAUSE_FILE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.annotations['external-scheduler.hami.io/intercept-pause-file']
-            - name: CUDA_INTERCEPT_LOG_PATH
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.annotations['external-scheduler.hami.io/intercept-log-path']
             - name: WORKLOAD_TASK_NAME
               value: thesis-text-embedding-inference-2
             - name: WORKLOAD_PRIORITY_TIER

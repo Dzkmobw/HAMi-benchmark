@@ -14,11 +14,11 @@ SUBMIT_INTERVAL_SECONDS="${SUBMIT_INTERVAL_SECONDS:-15}"
 usage() {
   cat <<'EOF'
 Usage:
-  ./run-thesis-common <external|cuda-intercept>
+  ./run-thesis-common <external>
 EOF
 }
 
-if [[ "$MODE" != "external" && "$MODE" != "cuda-intercept" ]]; then
+if [[ "$MODE" != "external" ]]; then
   usage >&2
   exit 1
 fi
