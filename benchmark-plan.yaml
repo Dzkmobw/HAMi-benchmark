@@ -1,73 +1,77 @@
 benchmark:
-  name: single-4070super-full-round
+  name: single-4070super-thesis-round
   objective:
     primary:
       - average_completion_time
+      - production_task_completion_time
       - gpu_utilization
       - gpu_memory_utilization
     secondary:
       - p95_completion_time
+      - throughput
+      - convergence
       - oom_count
-      - queued_job_stall_count
   cluster:
     gpu_model: RTX_4070_SUPER
     gpu_count: 1
     runtime: minikube_plus_hami
-  expected_duration_minutes: 10_to_20
+  expected_duration_minutes: 4_to_8
   mix:
-    short_inference: 7
-    medium_inference: 2
+    text_embedding_inference: 2
+    vision_inference: 1
     background_training: 1
+  scenarios:
+    - name: production-arrives-during-opportunistic-training
+      description: low-priority training starts first, then high-priority inference tasks arrive later
+      arrival_pattern_seconds:
+        background_training: 0
+        text_embedding_inference_1: 15
+        vision_inference_1: 30
+        text_embedding_inference_2: 45
   workloads:
-    - name: short-inference
-      purpose: reduce_average_completion_time
-      recommended_real_task: sentence_embedding_inference
+    - name: text-embedding-inference
+      purpose: represent_latency_sensitive_online_inference
+      recommended_real_task: sentence_transformer_embedding
       scheduler_annotations:
         external-scheduler.hami.io/enabled: "true"
         external-scheduler.hami.io/class: latency-sensitive
-        external-scheduler.hami.io/runtime-seconds: "30"
-        external-scheduler.hami.io/gpu-mem-mib: "1000"
+        external-scheduler.hami.io/runtime-seconds: "25"
+        external-scheduler.hami.io/gpu-mem-mib: "900"
       hami_resources:
         nvidia.com/gpu: "1"
-        nvidia.com/gpumem: "1000"
-        nvidia.com/gpucores: "20"
-    - name: medium-inference
-      purpose: increase_gpu_and_memory_utilization
-      recommended_real_task: yolov8n_inference
+        nvidia.com/gpumem: "900"
+        nvidia.com/gpucores: "12"
+    - name: vision-inference
+      purpose: represent_production_vision_inference_and_memory_pressure
+      recommended_real_task: resnet18_or_yolov8n_inference
       scheduler_annotations:
         external-scheduler.hami.io/enabled: "true"
         external-scheduler.hami.io/class: throughput
-        external-scheduler.hami.io/runtime-seconds: "90"
-        external-scheduler.hami.io/gpu-mem-mib: "2200"
+        external-scheduler.hami.io/runtime-seconds: "45"
+        external-scheduler.hami.io/gpu-mem-mib: "1800"
       hami_resources:
         nvidia.com/gpu: "1"
-        nvidia.com/gpumem: "2200"
-        nvidia.com/gpucores: "35"
-    - name: background-training
-      purpose: create_long_running_interference
+        nvidia.com/gpumem: "1800"
+        nvidia.com/gpucores: "24"
+    - name: background-cnn-training
+      purpose: represent_opportunistic_training_and_interference
       recommended_real_task: cifar10_resnet18_training
       scheduler_annotations:
         external-scheduler.hami.io/enabled: "true"
         external-scheduler.hami.io/class: background
-        external-scheduler.hami.io/runtime-seconds: "600"
-        external-scheduler.hami.io/gpu-mem-mib: "4000"
+        external-scheduler.hami.io/runtime-seconds: "120"
+        external-scheduler.hami.io/gpu-mem-mib: "3200"
       hami_resources:
         nvidia.com/gpu: "1"
-        nvidia.com/gpumem: "4000"
-        nvidia.com/gpucores: "45"
+        nvidia.com/gpumem: "3200"
+        nvidia.com/gpucores: "30"
   submission_pattern:
-    arrival_window_seconds: 30
+    arrival_window_seconds: 45
     order:
-      - background-training
-      - medium-inference
-      - medium-inference
-      - short-inference
-      - short-inference
-      - short-inference
-      - short-inference
-      - short-inference
-      - short-inference
-      - short-inference
+      - background-cnn-training
+      - text-embedding-inference
+      - vision-inference
+      - text-embedding-inference
   comparison_modes:
-    - hami_only
-    - hami_plus_external_scheduler
+    - static_exclusive_host
+    - external_scheduler_plus_cuda_intercept

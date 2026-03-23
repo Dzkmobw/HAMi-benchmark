@@ -1,34 +1,34 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: mini-short-inference-2
+  name: thesis-vision-inference-1
   labels:
-    benchmark.hami.io/plan: mini
+    benchmark.hami.io/plan: thesis
     benchmark.hami.io/mode: external
-    benchmark.hami.io/workload: short-inference
+    benchmark.hami.io/workload: vision-inference
+    benchmark.hami.io/tier: production
 spec:
   backoffLimit: 0
-  ttlSecondsAfterFinished: 3600
   template:
     metadata:
       labels:
-        benchmark.hami.io/plan: mini
+        benchmark.hami.io/plan: thesis
         benchmark.hami.io/mode: external
-        benchmark.hami.io/workload: short-inference
+        benchmark.hami.io/workload: vision-inference
+        benchmark.hami.io/tier: production
       annotations:
         external-scheduler.hami.io/enabled: "true"
-        external-scheduler.hami.io/class: latency-sensitive
-        external-scheduler.hami.io/runtime-seconds: "30"
-        external-scheduler.hami.io/gpu-mem-mib: "800"
+        external-scheduler.hami.io/class: throughput
+        external-scheduler.hami.io/runtime-seconds: "45"
+        external-scheduler.hami.io/gpu-mem-mib: "1800"
     spec:
-      schedulingGates:
-        - name: external-scheduler.hami.io/admission
       restartPolicy: Never
+      schedulerName: hami-scheduler
       containers:
         - name: worker
           image: hami-cuda-intercept-runtime:local
           imagePullPolicy: IfNotPresent
-          command: ["python", "/workloads/mini_workload.py"]
+          command: ["python", "/workloads/thesis_workload.py"]
           env:
             - name: LD_PRELOAD
               value: /opt/cuda-intercept/libcuda_intercept.so
@@ -52,24 +52,31 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.annotations['external-scheduler.hami.io/intercept-log-path']
+            - name: WORKLOAD_TASK_NAME
+              value: thesis-vision-inference-1
+            - name: WORKLOAD_PRIORITY_TIER
+              value: production
             - name: WORKLOAD_KIND
-              value: short-inference
+              value: vision-inference
             - name: WORKLOAD_RUNTIME_SECONDS
-              value: "30"
+              value: "45"
             - name: WORKLOAD_RESERVE_MIB
-              value: "400"
+              value: "1500"
             - name: WORKLOAD_BATCH_SIZE
-              value: "256"
+              value: "16"
           resources:
+            requests:
+              nvidia.com/gpu: "1"
+              nvidia.com/gpumem: "1800"
+              nvidia.com/gpucores: "24"
             limits:
               nvidia.com/gpu: "1"
-              nvidia.com/gpumem: "800"
-              nvidia.com/gpucores: "10"
+              nvidia.com/gpumem: "1800"
+              nvidia.com/gpucores: "24"
           volumeMounts:
             - name: workloads
               mountPath: /workloads
       volumes:
         - name: workloads
           configMap:
-            name: hami-benchmark-mini-workloads
----
+            name: hami-benchmark-thesis-workloads

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+NAMESPACE="${NAMESPACE:-hami-benchmark-thesis}"
+
+kubectl delete job -n "$NAMESPACE" -l benchmark.hami.io/plan=thesis --ignore-not-found=true
+kubectl delete pod -n "$NAMESPACE" -l benchmark.hami.io/plan=thesis --ignore-not-found=true
+kubectl delete configmap -n "$NAMESPACE" hami-benchmark-thesis-workloads --ignore-not-found=true

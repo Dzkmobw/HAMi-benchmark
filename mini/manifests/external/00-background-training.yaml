@@ -26,10 +26,32 @@ spec:
       restartPolicy: Never
       containers:
         - name: worker
-          image: pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime
+          image: hami-cuda-intercept-runtime:local
           imagePullPolicy: IfNotPresent
           command: ["python", "/workloads/mini_workload.py"]
           env:
+            - name: LD_PRELOAD
+              value: /opt/cuda-intercept/libcuda_intercept.so
+            - name: CUDA_INTERCEPT_TASK_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CUDA_INTERCEPT_MEMORY_LIMIT_MIB
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['external-scheduler.hami.io/intercept-memory-limit-mib']
+            - name: CUDA_INTERCEPT_KERNEL_DELAY_US
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['external-scheduler.hami.io/intercept-kernel-delay-us']
+            - name: CUDA_INTERCEPT_PAUSE_FILE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['external-scheduler.hami.io/intercept-pause-file']
+            - name: CUDA_INTERCEPT_LOG_PATH
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['external-scheduler.hami.io/intercept-log-path']
             - name: WORKLOAD_KIND
               value: background-training
             - name: WORKLOAD_RUNTIME_SECONDS

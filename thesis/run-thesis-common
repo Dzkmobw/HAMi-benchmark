@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MODE="${1:-}"
+NAMESPACE="${NAMESPACE:-hami-benchmark-thesis}"
+CONFIGMAP_NAME="${CONFIGMAP_NAME:-hami-benchmark-thesis-workloads}"
+PROFILE="${PROFILE:-minikube}"
+GPU_TOTAL_MIB="${GPU_TOTAL_MIB:-12288}"
+WAIT_TIMEOUT="${WAIT_TIMEOUT:-900s}"
+SUBMIT_INTERVAL_SECONDS="${SUBMIT_INTERVAL_SECONDS:-15}"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ./run-thesis-common <external|cuda-intercept>
+EOF
+}
+
+if [[ "$MODE" != "external" && "$MODE" != "cuda-intercept" ]]; then
+  usage >&2
+  exit 1
+fi
+
+need_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+need_cmd kubectl
+need_cmd minikube
+need_cmd python3
+need_cmd docker
+need_cmd rg
+
+wait_for_jobs() {
+  local timeout_seconds start_time total_jobs completed_jobs failed_jobs
+
+  timeout_seconds="${WAIT_TIMEOUT%s}"
+  if [[ "$timeout_seconds" == "$WAIT_TIMEOUT" ]]; then
+    echo "Unsupported WAIT_TIMEOUT format: $WAIT_TIMEOUT" >&2
+    return 1
+  fi
+
+  start_time="$(date +%s)"
+  while true; do
+    total_jobs="$(kubectl get jobs -n "$NAMESPACE" -l "$SELECTOR" --no-headers 2>/dev/null | wc -l | tr -d ' ')"
+    completed_jobs="$(
+      kubectl get jobs -n "$NAMESPACE" -l "$SELECTOR" \
+        -o jsonpath='{range .items[*]}{.status.succeeded}{"\n"}{end}' \
+        | awk '$1 > 0 { count++ } END { print count + 0 }'
+    )"
+    failed_jobs="$(
+      kubectl get jobs -n "$NAMESPACE" -l "$SELECTOR" \
+        -o jsonpath='{range .items[*]}{.status.failed}{"\n"}{end}' \
+        | awk '$1 > 0 { count++ } END { print count + 0 }'
+    )"
+
+    if [[ "$total_jobs" != "0" && "$completed_jobs" == "$total_jobs" ]]; then
+      return 0
+    fi
+
+    if [[ "$failed_jobs" != "0" ]]; then
+      echo "Detected failed jobs while waiting for completion." >&2
+      kubectl get jobs -n "$NAMESPACE" -l "$SELECTOR" -o wide || true
+      kubectl get pods -n "$NAMESPACE" -l "$SELECTOR" -o wide || true
+      return 1
+    fi
+
+    if (( $(date +%s) - start_time >= timeout_seconds )); then
+      echo "Timed out waiting for jobs after $WAIT_TIMEOUT" >&2
+      kubectl get jobs -n "$NAMESPACE" -l "$SELECTOR" -o wide || true
+      kubectl get pods -n "$NAMESPACE" -l "$SELECTOR" -o wide || true
+      return 1
+    fi
+
+    sleep 5
+  done
+}
+
+INTERCEPT_RUNTIME_IMAGE="${CUDA_INTERCEPT_RUNTIME_IMAGE:-hami-cuda-intercept-runtime:local}"
+INTERCEPT_BUILDER="${CUDA_INTERCEPT_BUILDER:-/home/ttk/project/HAMi-external-scheduler/cuda-intercept/build-runtime-image.sh}"
+
+if ! docker image inspect "$INTERCEPT_RUNTIME_IMAGE" >/dev/null 2>&1; then
+  if [[ -x "$INTERCEPT_BUILDER" ]]; then
+    echo "==> Building CUDA intercept runtime image: $INTERCEPT_RUNTIME_IMAGE"
+    "$INTERCEPT_BUILDER"
+  else
+    echo "Missing CUDA intercept runtime image ($INTERCEPT_RUNTIME_IMAGE) and builder ($INTERCEPT_BUILDER)" >&2
+    exit 1
+  fi
+fi
+
+if minikube -p "$PROFILE" image ls | rg -F "$INTERCEPT_RUNTIME_IMAGE" >/dev/null 2>&1; then
+  echo "==> CUDA intercept runtime image already present in minikube: $INTERCEPT_RUNTIME_IMAGE"
+else
+  echo "==> Loading CUDA intercept runtime image into minikube: $INTERCEPT_RUNTIME_IMAGE"
+  minikube -p "$PROFILE" image load "$INTERCEPT_RUNTIME_IMAGE"
+fi
+
+METRICS_ENDPOINT="${HAMI_METRICS_ENDPOINT:-http://$(minikube -p "$PROFILE" ip):31992/metrics}"
+SELECTOR="benchmark.hami.io/plan=thesis,benchmark.hami.io/mode=${MODE}"
+TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+LOG_DIR="$ROOT_DIR/logs/${TIMESTAMP}-${MODE}"
+SAMPLER_PID=""
+
+cleanup() {
+  local status=$?
+  trap - EXIT INT TERM
+  if [[ -n "$SAMPLER_PID" ]] && kill -0 "$SAMPLER_PID" 2>/dev/null; then
+    kill "$SAMPLER_PID" 2>/dev/null || true
+    wait "$SAMPLER_PID" 2>/dev/null || true
+  fi
+  python3 "$ROOT_DIR/tools/benchmark_logger.py" summarize \
+    --namespace "$NAMESPACE" \
+    --selector "$SELECTOR" \
+    --metrics-endpoint "$METRICS_ENDPOINT" \
+    --gpu-total-mib "$GPU_TOTAL_MIB" \
+    --log-dir "$LOG_DIR" \
+    --mode "$MODE" || true
+  exit "$status"
+}
+
+trap cleanup EXIT INT TERM
+
+mkdir -p "$LOG_DIR"
+exec > >(tee -a "$LOG_DIR/run.log") 2>&1
+
+echo "==> Thesis benchmark mode: $MODE"
+echo "==> Namespace: $NAMESPACE"
+echo "==> Metrics endpoint: $METRICS_ENDPOINT"
+echo "==> Log dir: $LOG_DIR"
+
+kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$NAMESPACE"
+
+echo "==> Refreshing thesis workload configmap: $CONFIGMAP_NAME"
+kubectl -n "$NAMESPACE" create configmap "$CONFIGMAP_NAME" \
+  --from-file=thesis_workload.py="$ROOT_DIR/workloads/thesis_workload.py" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+echo "==> Cleaning previous thesis jobs"
+kubectl delete job -n "$NAMESPACE" -l benchmark.hami.io/plan=thesis --ignore-not-found=true >/dev/null 2>&1 || true
+
+echo "==> Starting metric sampler"
+python3 "$ROOT_DIR/tools/benchmark_logger.py" sample \
+  --namespace "$NAMESPACE" \
+  --selector "$SELECTOR" \
+  --metrics-endpoint "$METRICS_ENDPOINT" \
+  --gpu-total-mib "$GPU_TOTAL_MIB" \
+  --log-dir "$LOG_DIR" \
+  --interval-seconds 2 &
+SAMPLER_PID=$!
+
+MANIFEST_DIR="$ROOT_DIR/manifests/${MODE}"
+mapfile -t manifests < <(find "$MANIFEST_DIR" -maxdepth 1 -type f -name '*.yaml' | sort)
+
+echo "==> Submitting thesis round"
+for i in "${!manifests[@]}"; do
+  kubectl apply -n "$NAMESPACE" -f "${manifests[$i]}"
+  if [[ "$i" -lt $((${#manifests[@]} - 1)) ]]; then
+    sleep "$SUBMIT_INTERVAL_SECONDS"
+  fi
+done
+
+echo "==> Waiting for jobs to complete"
+wait_for_jobs
+
+echo "Thesis benchmark run completed successfully."

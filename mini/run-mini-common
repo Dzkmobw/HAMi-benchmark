@@ -33,6 +33,25 @@ need_cmd kubectl
 need_cmd minikube
 need_cmd python3
 
+INTERCEPT_RUNTIME_IMAGE="${CUDA_INTERCEPT_RUNTIME_IMAGE:-hami-cuda-intercept-runtime:local}"
+INTERCEPT_BUILDER="${CUDA_INTERCEPT_BUILDER:-/home/ttk/project/HAMi-external-scheduler/cuda-intercept/build-runtime-image.sh}"
+
+if [[ "$MODE" == "external" ]]; then
+  need_cmd docker
+  if ! docker image inspect "$INTERCEPT_RUNTIME_IMAGE" >/dev/null 2>&1; then
+    if [[ -x "$INTERCEPT_BUILDER" ]]; then
+      echo "==> Building CUDA intercept runtime image: $INTERCEPT_RUNTIME_IMAGE"
+      "$INTERCEPT_BUILDER"
+    else
+      echo "Missing CUDA intercept runtime image ($INTERCEPT_RUNTIME_IMAGE) and builder ($INTERCEPT_BUILDER)" >&2
+      exit 1
+    fi
+  fi
+
+  echo "==> Loading CUDA intercept runtime image into minikube: $INTERCEPT_RUNTIME_IMAGE"
+  minikube -p "$PROFILE" image load "$INTERCEPT_RUNTIME_IMAGE"
+fi
+
 METRICS_ENDPOINT="${HAMI_METRICS_ENDPOINT:-http://$(minikube -p "$PROFILE" ip):31992/metrics}"
 SELECTOR="benchmark.hami.io/plan=mini,benchmark.hami.io/mode=${MODE}"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
