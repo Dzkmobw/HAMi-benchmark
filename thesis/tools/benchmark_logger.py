@@ -149,6 +149,17 @@ def extract_training_epoch_metrics(log_text: str) -> list[dict]:
     return metrics
 
 
+def extract_pause_events(intercept_log_lines: list[str]) -> list[str]:
+    return [
+        line
+        for line in intercept_log_lines
+        if "pause entered" in line
+        or "pause released" in line
+        or "pause_file detected" in line
+        or "pause_file cleared" in line
+    ]
+
+
 def time_to_accuracy_threshold(epoch_metrics: list[dict], threshold: float) -> float | None:
     for metric in epoch_metrics:
         accuracy = metric.get("epoch_average_accuracy")
@@ -199,6 +210,8 @@ def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_tot
     total_processed_samples = 0
     intercept_log_pod_count = 0
     intercept_event_count = 0
+    pause_event_pod_count = 0
+    pause_event_count = 0
     benchmark_start = None
     benchmark_finish = None
     failed_pod_count = 0
@@ -241,6 +254,7 @@ def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_tot
         pod_log = run_kubectl_logs(namespace, meta.get("name", ""))
         result_payload = extract_result_payload(pod_log)
         intercept_log_lines = extract_intercept_log(pod_log)
+        pause_events = extract_pause_events(intercept_log_lines)
         epoch_metrics = extract_training_epoch_metrics(pod_log)
         threshold_time = time_to_accuracy_threshold(epoch_metrics, DEFAULT_TRAINING_ACCURACY_THRESHOLD)
 
@@ -272,6 +286,9 @@ def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_tot
         if intercept_log_lines:
             intercept_log_pod_count += 1
             intercept_event_count += len(intercept_log_lines)
+        if pause_events:
+            pause_event_pod_count += 1
+            pause_event_count += len(pause_events)
 
         if phase == "Failed":
             failed_pod_count += 1
@@ -297,6 +314,9 @@ def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_tot
                 "training_time_to_accuracy_threshold_seconds": threshold_time,
                 "intercept_log_detected": bool(intercept_log_lines),
                 "intercept_event_count": len(intercept_log_lines),
+                "pause_event_detected": bool(pause_events),
+                "pause_event_count": len(pause_events),
+                "pause_events": pause_events,
             }
         )
 
@@ -326,6 +346,8 @@ def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_tot
         "aggregate_sample_throughput_per_second": aggregate_sample_throughput,
         "intercept_log_pod_count": intercept_log_pod_count,
         "intercept_event_count": intercept_event_count,
+        "pause_event_pod_count": pause_event_pod_count,
+        "pause_event_count": pause_event_count,
         "high_priority_average_completion_time_seconds": statistics.mean(production_completion) if production_completion else None,
         "high_priority_p95_completion_time_seconds": percentile(production_completion, 0.95),
         "high_priority_average_queue_delay_seconds": statistics.mean(production_queue_delay) if production_queue_delay else None,
@@ -374,6 +396,8 @@ def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_tot
         f"aggregate_sample_throughput_per_second: {summary['aggregate_sample_throughput_per_second']}",
         f"intercept_log_pod_count: {summary['intercept_log_pod_count']}",
         f"intercept_event_count: {summary['intercept_event_count']}",
+        f"pause_event_pod_count: {summary['pause_event_pod_count']}",
+        f"pause_event_count: {summary['pause_event_count']}",
         f"high_priority_average_completion_time_seconds: {summary['high_priority_average_completion_time_seconds']}",
         f"high_priority_p95_completion_time_seconds: {summary['high_priority_p95_completion_time_seconds']}",
         f"high_priority_average_queue_delay_seconds: {summary['high_priority_average_queue_delay_seconds']}",

@@ -26,7 +26,7 @@ spec:
       schedulerName: hami-scheduler
       containers:
         - name: worker
-          image: hami-cuda-intercept-runtime:local
+          image: hami-cuda-intercept-runtime:pause-v2
           imagePullPolicy: IfNotPresent
           command: ["python", "/workloads/thesis_workload.py"]
           env:
@@ -36,6 +36,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: CUDA_INTERCEPT_PAUSE_FILE
+              value: /control/high-priority.pause
             - name: WORKLOAD_TASK_NAME
               value: thesis-background-cnn-training
             - name: WORKLOAD_PRIORITY_TIER
@@ -68,6 +70,8 @@ spec:
               mountPath: /workloads
             - name: benchmark-data
               mountPath: /data
+            - name: benchmark-control
+              mountPath: /control
             - name: dshm
               mountPath: /dev/shm
       volumes:
@@ -77,6 +81,10 @@ spec:
         - name: benchmark-data
           hostPath:
             path: /var/lib/hami-benchmark-data
+            type: DirectoryOrCreate
+        - name: benchmark-control
+          hostPath:
+            path: /var/lib/hami-benchmark-control
             type: DirectoryOrCreate
         - name: dshm
           emptyDir:
