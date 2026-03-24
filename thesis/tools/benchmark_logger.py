@@ -430,7 +430,7 @@ def main() -> int:
     sample.add_argument("--metrics-endpoint", required=True)
     sample.add_argument("--gpu-total-mib", type=float, default=12288.0)
     sample.add_argument("--log-dir", required=True)
-    sample.add_argument("--interval-seconds", type=float, default=2.0)
+    sample.add_argument("--interval-seconds", type=float, default=1.0)
 
     summarize = subparsers.add_parser("summarize")
     summarize.add_argument("--namespace", required=True)

@@ -151,7 +151,7 @@ python3 "$ROOT_DIR/tools/benchmark_logger.py" sample \
   --metrics-endpoint "$METRICS_ENDPOINT" \
   --gpu-total-mib "$GPU_TOTAL_MIB" \
   --log-dir "$LOG_DIR" \
-  --interval-seconds 2 &
+  --interval-seconds 1 &
 SAMPLER_PID=$!
 
 MANIFEST_DIR="$ROOT_DIR/manifests/${MODE}"

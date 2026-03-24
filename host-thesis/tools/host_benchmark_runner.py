@@ -216,7 +216,7 @@ def run_benchmark() -> int:
     metrics_csv_path = log_dir / "metrics_samples.csv"
 
     stop_event = threading.Event()
-    sampler = threading.Thread(target=sampler_loop, args=(metrics_csv_path, gpu_total_mib, 2.0, stop_event), daemon=True)
+    sampler = threading.Thread(target=sampler_loop, args=(metrics_csv_path, gpu_total_mib, 1.0, stop_event), daemon=True)
     sampler.start()
 
     results: list[TaskResult] = []
