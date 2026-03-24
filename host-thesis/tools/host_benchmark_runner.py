@@ -20,6 +20,86 @@ WORKLOAD_PATH = Path("/home/ttk/project/HAMi-benchmark/thesis/workloads/thesis_w
 TRAINING_ACCURACY_THRESHOLD = float(os.environ.get("TRAINING_ACCURACY_THRESHOLD", "0.5"))
 WORKLOAD_DATA_ROOT_HOST = Path(os.environ.get("WORKLOAD_DATA_ROOT_HOST", "/mnt/data/benchmark-data"))
 
+SUMMARY_KEY_ORDER = [
+    "mode",
+    "namespace",
+    "selector",
+    "metrics_endpoint",
+    "gpu_total_mib",
+    "job_count",
+    "pod_count",
+    "completed_pod_count",
+    "failed_pod_count",
+    "oom_count",
+    "total_benchmark_wall_time_seconds",
+    "max_task_completion_time_seconds",
+    "average_completion_time_seconds",
+    "p95_completion_time_seconds",
+    "p99_completion_time_seconds",
+    "average_runtime_seconds",
+    "average_queue_delay_seconds",
+    "throughput_tasks_per_minute",
+    "total_processed_samples",
+    "aggregate_sample_throughput_per_second",
+    "intercept_log_pod_count",
+    "intercept_event_count",
+    "pause_event_pod_count",
+    "pause_event_count",
+    "pause_total_waited_ms",
+    "high_priority_average_completion_time_seconds",
+    "high_priority_p95_completion_time_seconds",
+    "high_priority_p99_completion_time_seconds",
+    "high_priority_average_queue_delay_seconds",
+    "high_priority_average_batch_latency_ms",
+    "opportunistic_average_runtime_seconds",
+    "average_training_final_loss",
+    "average_training_final_accuracy",
+    "training_best_accuracy",
+    "training_accuracy_threshold",
+    "training_curve_task_count",
+    "training_accuracy_threshold_hit_count",
+    "average_training_time_to_accuracy_threshold_seconds",
+    "p95_training_time_to_accuracy_threshold_seconds",
+    "average_gpu_utilization_percent",
+    "average_gpu_memory_utilization_percent",
+    "average_gpu_memory_used_mib",
+    "max_gpu_utilization_percent",
+    "max_gpu_memory_utilization_percent",
+]
+
+TASK_KEY_ORDER = [
+    "name",
+    "phase",
+    "tier",
+    "workload",
+    "creation_timestamp",
+    "start_time",
+    "finish_time",
+    "elapsed_submission_to_completion_seconds",
+    "runtime_seconds",
+    "queue_delay_seconds",
+    "terminated_reason",
+    "result_payload",
+    "training_epoch_metrics",
+    "training_epoch_count",
+    "training_time_to_accuracy_threshold_seconds",
+    "intercept_log_detected",
+    "intercept_event_count",
+    "pause_event_detected",
+    "pause_event_count",
+    "pause_events",
+    "pause_total_waited_ms",
+]
+
+TRAINING_CURVE_KEY_ORDER = [
+    "name",
+    "workload",
+    "tier",
+    "epoch_metrics",
+    "best_accuracy",
+    "time_to_accuracy_threshold_seconds",
+]
+
 
 @dataclass
 class TaskSpec:
@@ -72,6 +152,69 @@ def utc_now() -> datetime:
 
 def format_dt(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
+
+
+def prune_empty(value: object) -> object | None:
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        cleaned: dict[str, object] = {}
+        for key, item in value.items():
+            pruned = prune_empty(item)
+            if pruned is None:
+                continue
+            if isinstance(pruned, (dict, list)) and not pruned:
+                continue
+            cleaned[key] = pruned
+        return cleaned
+    if isinstance(value, list):
+        cleaned_list = []
+        for item in value:
+            pruned = prune_empty(item)
+            if pruned is None:
+                continue
+            if isinstance(pruned, (dict, list)) and not pruned:
+                continue
+            cleaned_list.append(pruned)
+        return cleaned_list
+    if isinstance(value, str) and value == "":
+        return None
+    return value
+
+
+def order_dict(data: dict, key_order: list[str]) -> dict:
+    ordered: dict[str, object] = {}
+    for key in key_order:
+        if key in data:
+            ordered[key] = data[key]
+    for key, value in data.items():
+        if key not in ordered:
+            ordered[key] = value
+    return ordered
+
+
+def normalize_task_result(result: TaskResult) -> dict:
+    phase = "Succeeded" if result.return_code in (0, None) else "Failed"
+    terminated_reason = None if result.return_code in (0, None) else f"ExitCode:{result.return_code}"
+    normalized = {
+        "name": result.name,
+        "phase": phase,
+        "tier": result.priority_tier,
+        "workload": result.workload_kind,
+        "creation_timestamp": result.submitted_at,
+        "start_time": result.start_at,
+        "finish_time": result.finish_at,
+        "elapsed_submission_to_completion_seconds": result.completion_time_seconds,
+        "runtime_seconds": result.runtime_seconds,
+        "queue_delay_seconds": result.queue_delay_seconds,
+        "terminated_reason": terminated_reason,
+        "result_payload": result.result_payload,
+        "training_epoch_metrics": result.training_epoch_metrics,
+        "training_epoch_count": len(result.training_epoch_metrics) if result.training_epoch_metrics else None,
+        "training_time_to_accuracy_threshold_seconds": result.training_time_to_accuracy_threshold_seconds,
+        "pause_total_waited_ms": 0.0,
+    }
+    return order_dict(prune_empty(normalized) or {}, TASK_KEY_ORDER)
 
 
 def require_command(name: str) -> None:
@@ -287,12 +430,15 @@ def run_benchmark() -> int:
             stop_event.set()
             sampler.join(timeout=5)
 
-    tasks_json_path.write_text(json.dumps([asdict(result) for result in results], indent=2), encoding="utf-8")
-    summarize(log_dir, gpu_total_mib, results)
+    raw_tasks = [asdict(result) for result in results]
+    normalized_tasks = [normalize_task_result(result) for result in results]
+    tasks_json_path.write_text(json.dumps(raw_tasks, indent=2), encoding="utf-8")
+    (log_dir / "task_results.json").write_text(json.dumps(normalized_tasks, indent=2), encoding="utf-8")
+    summarize(log_dir, gpu_total_mib, results, normalized_tasks)
     return 0
 
 
-def summarize(log_dir: Path, gpu_total_mib: float, results: list[TaskResult]) -> None:
+def summarize(log_dir: Path, gpu_total_mib: float, results: list[TaskResult], normalized_tasks: list[dict]) -> None:
     metrics_csv = log_dir / "metrics_samples.csv"
     gpu_util_samples: list[float] = []
     gpu_mem_used_samples: list[float] = []
@@ -312,17 +458,42 @@ def summarize(log_dir: Path, gpu_total_mib: float, results: list[TaskResult]) ->
     queue = [r.queue_delay_seconds for r in results if r.queue_delay_seconds is not None]
     production_completion = [r.completion_time_seconds for r in results if r.priority_tier == "production" and r.completion_time_seconds is not None]
     production_queue = [r.queue_delay_seconds for r in results if r.priority_tier == "production" and r.queue_delay_seconds is not None]
+    production_batch_latency_ms = [
+        float(r.result_payload["avg_batch_latency_ms"])
+        for r in results
+        if r.priority_tier == "production" and r.result_payload and r.result_payload.get("avg_batch_latency_ms") is not None
+    ]
     opportunistic_runtime = [r.runtime_seconds for r in results if r.priority_tier == "opportunistic" and r.runtime_seconds is not None]
     training_losses = [float(r.result_payload["final_loss"]) for r in results if r.result_payload and r.result_payload.get("final_loss") is not None]
     training_accuracies = [float(r.result_payload["final_accuracy"]) for r in results if r.result_payload and r.result_payload.get("final_accuracy") is not None]
+    training_best_accuracies = [
+        max(
+            float(metric.get("epoch_average_accuracy", 0.0))
+            for metric in (r.training_epoch_metrics or [])
+            if metric.get("epoch_average_accuracy") is not None
+        )
+        for r in results
+        if r.training_epoch_metrics
+    ]
     training_curves = [
-        {
-            "name": r.name,
-            "workload": r.workload_kind,
-            "tier": r.priority_tier,
-            "epoch_metrics": r.training_epoch_metrics or [],
-            "time_to_accuracy_threshold_seconds": r.training_time_to_accuracy_threshold_seconds,
-        }
+        order_dict(
+            prune_empty(
+                {
+                    "name": r.name,
+                    "workload": r.workload_kind,
+                    "tier": r.priority_tier,
+                    "epoch_metrics": r.training_epoch_metrics or [],
+                    "best_accuracy": max(
+                        float(metric.get("epoch_average_accuracy", 0.0))
+                        for metric in (r.training_epoch_metrics or [])
+                        if metric.get("epoch_average_accuracy") is not None
+                    ) if r.training_epoch_metrics else None,
+                    "time_to_accuracy_threshold_seconds": r.training_time_to_accuracy_threshold_seconds,
+                }
+            )
+            or {},
+            TRAINING_CURVE_KEY_ORDER,
+        )
         for r in results
         if r.training_epoch_metrics
     ]
@@ -341,6 +512,7 @@ def summarize(log_dir: Path, gpu_total_mib: float, results: list[TaskResult]) ->
         "mode": "static-exclusive-host",
         "gpu_total_mib": gpu_total_mib,
         "job_count": len(results),
+        "pod_count": len(results),
         "completed_pod_count": len(results),
         "failed_pod_count": len([r for r in results if r.return_code not in (0, None)]),
         "oom_count": 0,
@@ -356,10 +528,14 @@ def summarize(log_dir: Path, gpu_total_mib: float, results: list[TaskResult]) ->
         "aggregate_sample_throughput_per_second": (total_processed_samples / wall_time) if wall_time > 0 else None,
         "high_priority_average_completion_time_seconds": statistics.mean(production_completion) if production_completion else None,
         "high_priority_p95_completion_time_seconds": percentile(production_completion, 0.95),
+        "high_priority_p99_completion_time_seconds": percentile(production_completion, 0.99),
         "high_priority_average_queue_delay_seconds": statistics.mean(production_queue) if production_queue else None,
+        "high_priority_average_batch_latency_ms": statistics.mean(production_batch_latency_ms) if production_batch_latency_ms else None,
+        "pause_total_waited_ms": 0.0,
         "opportunistic_average_runtime_seconds": statistics.mean(opportunistic_runtime) if opportunistic_runtime else None,
         "average_training_final_loss": statistics.mean(training_losses) if training_losses else None,
         "average_training_final_accuracy": statistics.mean(training_accuracies) if training_accuracies else None,
+        "training_best_accuracy": max(training_best_accuracies) if training_best_accuracies else None,
         "training_accuracy_threshold": TRAINING_ACCURACY_THRESHOLD,
         "training_curve_task_count": len(training_curves),
         "training_accuracy_threshold_hit_count": len(training_time_to_threshold),
@@ -370,33 +546,14 @@ def summarize(log_dir: Path, gpu_total_mib: float, results: list[TaskResult]) ->
         "average_gpu_memory_used_mib": statistics.mean(gpu_mem_used_samples) if gpu_mem_used_samples else None,
         "max_gpu_utilization_percent": max(gpu_util_samples) if gpu_util_samples else None,
         "max_gpu_memory_utilization_percent": max(gpu_mem_util_samples) if gpu_mem_util_samples else None,
-        "tasks": [asdict(result) for result in results],
+        "tasks": normalized_tasks,
     }
+
+    summary = order_dict(prune_empty(summary) or {}, SUMMARY_KEY_ORDER)
 
     (log_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     (log_dir / "training_curves.json").write_text(json.dumps(training_curves, indent=2), encoding="utf-8")
-    lines = [
-        f"mode: {summary['mode']}",
-        f"job_count: {summary['job_count']}",
-        f"completed_pod_count: {summary['completed_pod_count']}",
-        f"total_benchmark_wall_time_seconds: {summary['total_benchmark_wall_time_seconds']}",
-        f"average_completion_time_seconds: {summary['average_completion_time_seconds']}",
-        f"p95_completion_time_seconds: {summary['p95_completion_time_seconds']}",
-        f"average_queue_delay_seconds: {summary['average_queue_delay_seconds']}",
-        f"throughput_tasks_per_minute: {summary['throughput_tasks_per_minute']}",
-        f"aggregate_sample_throughput_per_second: {summary['aggregate_sample_throughput_per_second']}",
-        f"high_priority_average_completion_time_seconds: {summary['high_priority_average_completion_time_seconds']}",
-        f"high_priority_p95_completion_time_seconds: {summary['high_priority_p95_completion_time_seconds']}",
-        f"average_training_final_loss: {summary['average_training_final_loss']}",
-        f"average_training_final_accuracy: {summary['average_training_final_accuracy']}",
-        f"training_accuracy_threshold: {summary['training_accuracy_threshold']}",
-        f"training_curve_task_count: {summary['training_curve_task_count']}",
-        f"training_accuracy_threshold_hit_count: {summary['training_accuracy_threshold_hit_count']}",
-        f"average_training_time_to_accuracy_threshold_seconds: {summary['average_training_time_to_accuracy_threshold_seconds']}",
-        f"p95_training_time_to_accuracy_threshold_seconds: {summary['p95_training_time_to_accuracy_threshold_seconds']}",
-        f"average_gpu_utilization_percent: {summary['average_gpu_utilization_percent']}",
-        f"average_gpu_memory_utilization_percent: {summary['average_gpu_memory_utilization_percent']}",
-    ]
+    lines = [f"{key}: {summary[key]}" for key in SUMMARY_KEY_ORDER if key in summary]
     (log_dir / "summary.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
 
