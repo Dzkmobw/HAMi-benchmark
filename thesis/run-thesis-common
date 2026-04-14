@@ -81,7 +81,7 @@ wait_for_jobs() {
   done
 }
 
-INTERCEPT_RUNTIME_IMAGE="${CUDA_INTERCEPT_RUNTIME_IMAGE:-hami-cuda-intercept-runtime:pause-v2}"
+INTERCEPT_RUNTIME_IMAGE="${CUDA_INTERCEPT_RUNTIME_IMAGE:-hami-cuda-intercept-runtime:pause-v3}"
 INTERCEPT_BUILDER="${CUDA_INTERCEPT_BUILDER:-/home/ttk/project/HAMi-external-scheduler/cuda-intercept/build-runtime-image.sh}"
 
 if ! docker image inspect "$INTERCEPT_RUNTIME_IMAGE" >/dev/null 2>&1; then
