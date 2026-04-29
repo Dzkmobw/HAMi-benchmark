@@ -1,0 +1,110 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: thesis-background-cnn-training
+  labels:
+    benchmark.hami.io/plan: thesis
+    benchmark.hami.io/mode: external
+    benchmark.hami.io/workload: background-cnn-training
+    benchmark.hami.io/tier: opportunistic
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        benchmark.hami.io/plan: thesis
+        benchmark.hami.io/mode: external
+        benchmark.hami.io/workload: background-cnn-training
+        benchmark.hami.io/tier: opportunistic
+      annotations:
+        external-scheduler.hami.io/enabled: "true"
+        external-scheduler.hami.io/class: background
+        external-scheduler.hami.io/runtime-seconds: "120"
+        external-scheduler.hami.io/gpu-mem-mib: "3200"
+    spec:
+      restartPolicy: Never
+      schedulerName: hami-scheduler
+      containers:
+        - name: worker
+          image: hami-cuda-intercept-runtime:pause-v3
+          imagePullPolicy: IfNotPresent
+          command: ["python", "/workloads/thesis_workload.py"]
+          env:
+            - name: LD_PRELOAD
+              value: /opt/cuda-intercept/libcuda_intercept.so
+            - name: CUDA_INTERCEPT_TASK_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CUDA_INTERCEPT_CONTROL_DIR
+              value: /control
+            - name: CUDA_INTERCEPT_PAUSE_FILE
+              value: /control/high-priority.pause
+            - name: CUDA_INTERCEPT_DELAY_FILE
+              value: /control/opportunistic-delay-us
+            - name: WORKLOAD_TASK_NAME
+              value: thesis-background-cnn-training
+            - name: WORKLOAD_PRIORITY_TIER
+              value: opportunistic
+            - name: WORKLOAD_KIND
+              value: background-cnn-training
+            - name: WORKLOAD_RUNTIME_SECONDS
+              value: "120"
+            - name: WORKLOAD_RESERVE_MIB
+              value: "3200"
+            - name: WORKLOAD_BATCH_SIZE
+              value: "96"
+            - name: WORKLOAD_DATA_ROOT
+              value: /data
+            - name: TORCH_HOME
+              value: /data/torch-cache
+            - name: WORKLOAD_USE_PRETRAINED_VISION
+              value: "1"
+            - name: WORKLOAD_TRAIN_STOP_MODE
+              value: "slope"
+            - name: WORKLOAD_TRAIN_MIN_EPOCHS
+              value: "8"
+            - name: WORKLOAD_TRAIN_SLOPE_WINDOW
+              value: "5"
+            - name: WORKLOAD_TRAIN_SLOPE_THRESHOLD
+              value: "0.0015"
+            - name: WORKLOAD_TRAIN_SLOPE_PATIENCE
+              value: "2"
+            - name: WORKLOAD_TRAIN_SLOPE_MIN_ACCURACY
+              value: "0.8"
+            - name: TRAINING_ACCURACY_THRESHOLD
+              value: "0.5"
+          resources:
+            requests:
+              nvidia.com/gpu: "1"
+              nvidia.com/gpumem: "5000"
+              nvidia.com/gpucores: "50"
+            limits:
+              nvidia.com/gpu: "1"
+              nvidia.com/gpumem: "5000"
+              nvidia.com/gpucores: "50"
+          volumeMounts:
+            - name: workloads
+              mountPath: /workloads
+            - name: benchmark-data
+              mountPath: /data
+            - name: benchmark-control
+              mountPath: /control
+            - name: dshm
+              mountPath: /dev/shm
+      volumes:
+        - name: workloads
+          configMap:
+            name: hami-benchmark-thesis-workloads
+        - name: benchmark-data
+          hostPath:
+            path: /var/lib/hami-benchmark-data
+            type: DirectoryOrCreate
+        - name: benchmark-control
+          hostPath:
+            path: /var/lib/hami-benchmark-control
+            type: DirectoryOrCreate
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi

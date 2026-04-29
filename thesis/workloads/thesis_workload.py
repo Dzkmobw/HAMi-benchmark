@@ -94,6 +94,23 @@ def emit_training_epoch_metric(
     )
 
 
+def compute_series_slope(values: list[float]) -> float:
+    if len(values) < 2:
+        return 0.0
+    n = float(len(values))
+    mean_x = (n - 1.0) / 2.0
+    mean_y = sum(values) / n
+    numerator = 0.0
+    denominator = 0.0
+    for index, value in enumerate(values):
+        x = float(index)
+        numerator += (x - mean_x) * (value - mean_y)
+        denominator += (x - mean_x) ** 2
+    if denominator <= 0.0:
+        return 0.0
+    return numerator / denominator
+
+
 def download_file(url: str, destination: str) -> None:
     os.makedirs(os.path.dirname(destination), exist_ok=True)
     if os.path.exists(destination):
@@ -352,6 +369,19 @@ def background_cnn_training(device: torch.device, runtime_seconds: int, reserve_
     _buffer = maybe_reserve_memory(device, reserve_mib)
     samples_per_epoch = get_env_int("WORKLOAD_TRAIN_SAMPLES_PER_EPOCH", 4096)
     batches_per_epoch = max(1, math.ceil(samples_per_epoch / max(batch_size, 1)))
+    train_stop_mode = get_env_str("WORKLOAD_TRAIN_STOP_MODE", "fixed_steps").strip().lower()
+    if train_stop_mode not in {"fixed_steps", "slope"}:
+        train_stop_mode = "fixed_steps"
+    train_min_epochs = max(1, get_env_int("WORKLOAD_TRAIN_MIN_EPOCHS", 8))
+    slope_window = max(3, get_env_int("WORKLOAD_TRAIN_SLOPE_WINDOW", 5))
+    slope_threshold = get_env_float("WORKLOAD_TRAIN_SLOPE_THRESHOLD", 0.0015)
+    slope_patience = max(1, get_env_int("WORKLOAD_TRAIN_SLOPE_PATIENCE", 2))
+    slope_min_accuracy = get_env_float("WORKLOAD_TRAIN_SLOPE_MIN_ACCURACY", 0.8)
+    fixed_epochs = max(1, get_env_int("WORKLOAD_TRAIN_FIXED_EPOCHS", 90))
+    fixed_steps_default = fixed_epochs * batches_per_epoch
+    fixed_steps_raw = get_env_int("WORKLOAD_TRAIN_FIXED_STEPS", 0)
+    fixed_steps_target = fixed_steps_default if fixed_steps_raw <= 0 else max(1, fixed_steps_raw)
+    training_threshold = get_env_float("TRAINING_ACCURACY_THRESHOLD", 0.8)
     started = time.monotonic()
     batches = 0
     processed = 0
@@ -362,6 +392,14 @@ def background_cnn_training(device: torch.device, runtime_seconds: int, reserve_
     epoch_processed = 0
     epoch_loss_total = 0.0
     epoch_accuracy_total = 0.0
+    epoch_accuracy_history: list[float] = []
+    slope_converged_windows = 0
+    last_accuracy_slope: float | None = None
+    best_accuracy = 0.0
+    threshold_hit_seconds: float | None = None
+    training_converged = False
+    training_stop_reason = "time_budget_exhausted"
+    fixed_steps_reached = False
     while time.monotonic() - started < runtime_seconds:
         images, labels = next(batches_iter)
         images = images.to(device, non_blocking=True)
@@ -387,26 +425,55 @@ def background_cnn_training(device: torch.device, runtime_seconds: int, reserve_
         else:
             loss_ema = 0.9 * loss_ema + 0.1 * loss.item()
             acc_ema = 0.9 * acc_ema + 0.1 * accuracy
-        if epoch_batches >= batches_per_epoch or time.monotonic() - started >= runtime_seconds:
+        time_budget_exhausted = time.monotonic() - started >= runtime_seconds
+        fixed_steps_hit_now = train_stop_mode == "fixed_steps" and batches >= fixed_steps_target
+        should_close_epoch = epoch_batches >= batches_per_epoch or time_budget_exhausted or fixed_steps_hit_now
+        if should_close_epoch:
             epoch_index += 1
+            elapsed_seconds = time.monotonic() - started
+            epoch_average_loss = epoch_loss_total / max(epoch_batches, 1)
+            epoch_average_accuracy = epoch_accuracy_total / max(epoch_batches, 1)
             emit_training_epoch_metric(
                 task_name=task_name,
                 priority_tier=priority_tier,
                 epoch_index=epoch_index,
-                elapsed_seconds=time.monotonic() - started,
+                elapsed_seconds=elapsed_seconds,
                 epoch_batches=epoch_batches,
                 epoch_processed_samples=epoch_processed,
                 total_processed_samples=processed,
-                epoch_average_loss=epoch_loss_total / max(epoch_batches, 1),
-                epoch_average_accuracy=epoch_accuracy_total / max(epoch_batches, 1),
+                epoch_average_loss=epoch_average_loss,
+                epoch_average_accuracy=epoch_average_accuracy,
                 smoothed_loss=loss_ema,
                 smoothed_accuracy=acc_ema,
             )
+            epoch_accuracy_history.append(epoch_average_accuracy)
+            if epoch_average_accuracy > best_accuracy:
+                best_accuracy = epoch_average_accuracy
+            if threshold_hit_seconds is None and epoch_average_accuracy >= training_threshold:
+                threshold_hit_seconds = elapsed_seconds
+
+            if train_stop_mode == "slope":
+                if epoch_index >= train_min_epochs and len(epoch_accuracy_history) >= slope_window:
+                    window_values = epoch_accuracy_history[-slope_window:]
+                    last_accuracy_slope = compute_series_slope(window_values)
+                    if abs(last_accuracy_slope) <= slope_threshold and epoch_average_accuracy >= slope_min_accuracy:
+                        slope_converged_windows += 1
+                    else:
+                        slope_converged_windows = 0
+                    if slope_converged_windows >= slope_patience:
+                        training_converged = True
+                        training_stop_reason = "converged_slope"
+                        break
+            elif fixed_steps_hit_now:
+                fixed_steps_reached = True
+                training_stop_reason = "fixed_steps_reached"
+                break
+
             epoch_batches = 0
             epoch_processed = 0
             epoch_loss_total = 0.0
             epoch_accuracy_total = 0.0
-    return build_result(
+    result = build_result(
         "background-cnn-training",
         task_name,
         priority_tier,
@@ -417,6 +484,27 @@ def background_cnn_training(device: torch.device, runtime_seconds: int, reserve_
         final_loss=loss_ema,
         final_accuracy=acc_ema,
     )
+    result.update(
+        {
+            "training_final_loss": loss_ema,
+            "training_final_accuracy": acc_ema,
+            "training_best_accuracy": best_accuracy,
+            "training_time_to_accuracy_threshold_seconds": threshold_hit_seconds,
+            "training_accuracy_threshold": training_threshold,
+            "training_converged": training_converged,
+            "training_stop_mode": train_stop_mode,
+            "training_stop_reason": training_stop_reason,
+            "training_slope_window": slope_window,
+            "training_slope_threshold": slope_threshold,
+            "training_slope_patience": slope_patience,
+            "training_slope_min_accuracy": slope_min_accuracy,
+            "training_slope_last": last_accuracy_slope,
+            "training_fixed_epochs": fixed_epochs,
+            "training_fixed_steps_target": fixed_steps_target,
+            "training_fixed_steps_reached": fixed_steps_reached,
+        }
+    )
+    return result
 
 
 def prepare_assets(device: torch.device, runtime_seconds: int, reserve_mib: int, batch_size: int, task_name: str, priority_tier: str) -> dict:

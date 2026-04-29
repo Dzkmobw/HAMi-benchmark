@@ -10,6 +10,7 @@ PROFILE="${PROFILE:-minikube}"
 GPU_TOTAL_MIB="${GPU_TOTAL_MIB:-12288}"
 WAIT_TIMEOUT="${WAIT_TIMEOUT:-900s}"
 SUBMIT_INTERVAL_SECONDS="${SUBMIT_INTERVAL_SECONDS:-15}"
+THESIS_TRAINING_PROTOCOL="${THESIS_TRAINING_PROTOCOL:-main_fixed_steps}"
 
 usage() {
   cat <<'EOF'
@@ -130,6 +131,7 @@ mkdir -p "$LOG_DIR"
 exec > >(tee -a "$LOG_DIR/run.log") 2>&1
 
 echo "==> Thesis benchmark mode: $MODE"
+echo "==> Training protocol: $THESIS_TRAINING_PROTOCOL"
 echo "==> Namespace: $NAMESPACE"
 echo "==> Metrics endpoint: $METRICS_ENDPOINT"
 echo "==> Log dir: $LOG_DIR"
@@ -155,7 +157,33 @@ python3 "$ROOT_DIR/tools/benchmark_logger.py" sample \
 SAMPLER_PID=$!
 
 MANIFEST_DIR="$ROOT_DIR/manifests/${MODE}"
-mapfile -t manifests < <(find "$MANIFEST_DIR" -maxdepth 1 -type f -name '*.yaml' | sort)
+case "$THESIS_TRAINING_PROTOCOL" in
+  main_fixed_steps|fixed_steps)
+    BACKGROUND_MANIFEST="$MANIFEST_DIR/00-background-cnn-training-fixed.yaml"
+    ;;
+  supplement_slope|slope)
+    BACKGROUND_MANIFEST="$MANIFEST_DIR/00-background-cnn-training-slope.yaml"
+    ;;
+  *)
+    echo "Unsupported THESIS_TRAINING_PROTOCOL: $THESIS_TRAINING_PROTOCOL" >&2
+    echo "Use one of: main_fixed_steps, fixed_steps, supplement_slope, slope" >&2
+    exit 1
+    ;;
+esac
+
+manifests=(
+  "$BACKGROUND_MANIFEST"
+  "$MANIFEST_DIR/10-text-embedding-inference-1.yaml"
+  "$MANIFEST_DIR/20-vision-inference-1.yaml"
+  "$MANIFEST_DIR/30-text-embedding-inference-2.yaml"
+)
+
+for manifest in "${manifests[@]}"; do
+  if [[ ! -f "$manifest" ]]; then
+    echo "Missing manifest: $manifest" >&2
+    exit 1
+  fi
+done
 
 echo "==> Submitting thesis round"
 for i in "${!manifests[@]}"; do

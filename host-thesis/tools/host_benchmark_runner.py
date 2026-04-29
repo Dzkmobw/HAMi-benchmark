@@ -19,6 +19,7 @@ IMAGE = "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime"
 WORKLOAD_PATH = Path("/home/ttk/project/HAMi-benchmark/thesis/workloads/thesis_workload.py")
 TRAINING_ACCURACY_THRESHOLD = float(os.environ.get("TRAINING_ACCURACY_THRESHOLD", "0.5"))
 WORKLOAD_DATA_ROOT_HOST = Path(os.environ.get("WORKLOAD_DATA_ROOT_HOST", "/mnt/data/benchmark-data"))
+THESIS_TRAINING_PROTOCOL = os.environ.get("THESIS_TRAINING_PROTOCOL", "main_fixed_steps").strip().lower()
 
 SUMMARY_KEY_ORDER = [
     "mode",
@@ -261,6 +262,41 @@ def sampler_loop(csv_path: Path, gpu_total_mib: float, interval_seconds: float, 
 
 def docker_command(task: TaskSpec) -> list[str]:
     workload_dir = str(WORKLOAD_PATH.parent)
+    training_env: list[tuple[str, str]]
+    if THESIS_TRAINING_PROTOCOL in {"supplement_slope", "slope"}:
+        training_env = [
+            ("WORKLOAD_TRAIN_STOP_MODE", "slope"),
+            ("WORKLOAD_TRAIN_MIN_EPOCHS", os.environ.get("WORKLOAD_TRAIN_MIN_EPOCHS", "8")),
+            ("WORKLOAD_TRAIN_SLOPE_WINDOW", os.environ.get("WORKLOAD_TRAIN_SLOPE_WINDOW", "5")),
+            ("WORKLOAD_TRAIN_SLOPE_THRESHOLD", os.environ.get("WORKLOAD_TRAIN_SLOPE_THRESHOLD", "0.0015")),
+            ("WORKLOAD_TRAIN_SLOPE_PATIENCE", os.environ.get("WORKLOAD_TRAIN_SLOPE_PATIENCE", "2")),
+            ("WORKLOAD_TRAIN_SLOPE_MIN_ACCURACY", os.environ.get("WORKLOAD_TRAIN_SLOPE_MIN_ACCURACY", "0.8")),
+            ("TRAINING_ACCURACY_THRESHOLD", str(TRAINING_ACCURACY_THRESHOLD)),
+        ]
+    else:
+        training_env = [
+            ("WORKLOAD_TRAIN_STOP_MODE", "fixed_steps"),
+            ("WORKLOAD_TRAIN_FIXED_EPOCHS", os.environ.get("WORKLOAD_TRAIN_FIXED_EPOCHS", "90")),
+            ("WORKLOAD_TRAIN_FIXED_STEPS", os.environ.get("WORKLOAD_TRAIN_FIXED_STEPS", "0")),
+            ("TRAINING_ACCURACY_THRESHOLD", str(TRAINING_ACCURACY_THRESHOLD)),
+        ]
+
+    env_items = [
+        ("WORKLOAD_TASK_NAME", task.name),
+        ("WORKLOAD_PRIORITY_TIER", task.priority_tier),
+        ("WORKLOAD_KIND", task.workload_kind),
+        ("WORKLOAD_RUNTIME_SECONDS", str(task.runtime_seconds)),
+        ("WORKLOAD_RESERVE_MIB", str(task.reserve_mib)),
+        ("WORKLOAD_BATCH_SIZE", str(task.batch_size)),
+        ("WORKLOAD_DATA_ROOT", "/data"),
+        ("TORCH_HOME", "/data/torch-cache"),
+        ("WORKLOAD_USE_PRETRAINED_VISION", "1"),
+    ]
+    env_items.extend(training_env)
+    env_args: list[str] = []
+    for key, value in env_items:
+        env_args.extend(["-e", f"{key}={value}"])
+
     return [
         "docker",
         "run",
@@ -269,28 +305,11 @@ def docker_command(task: TaskSpec) -> list[str]:
         "all",
         "--shm-size",
         "2g",
-        "-e",
-        f"WORKLOAD_TASK_NAME={task.name}",
-        "-e",
-        f"WORKLOAD_PRIORITY_TIER={task.priority_tier}",
-        "-e",
-        f"WORKLOAD_KIND={task.workload_kind}",
-        "-e",
-        f"WORKLOAD_RUNTIME_SECONDS={task.runtime_seconds}",
-        "-e",
-        f"WORKLOAD_RESERVE_MIB={task.reserve_mib}",
-        "-e",
-        f"WORKLOAD_BATCH_SIZE={task.batch_size}",
-        "-e",
-        "WORKLOAD_DATA_ROOT=/data",
-        "-e",
-        "TORCH_HOME=/data/torch-cache",
-        "-e",
-        "WORKLOAD_USE_PRETRAINED_VISION=1",
         "-v",
         f"{workload_dir}:/workloads:ro",
         "-v",
         f"{WORKLOAD_DATA_ROOT_HOST}:/data",
+    ] + env_args + [
         IMAGE,
         "python",
         "/workloads/thesis_workload.py",
@@ -372,6 +391,7 @@ def run_benchmark() -> int:
             run_log.flush()
 
         log("==> Host thesis benchmark mode: static-exclusive-host")
+        log(f"==> Training protocol: {THESIS_TRAINING_PROTOCOL}")
         log(f"==> Image: {IMAGE}")
         log(f"==> Workload path: {WORKLOAD_PATH}")
         log(f"==> GPU total MiB: {gpu_total_mib}")
