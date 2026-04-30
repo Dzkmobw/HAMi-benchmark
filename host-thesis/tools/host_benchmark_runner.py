@@ -20,6 +20,8 @@ WORKLOAD_PATH = Path("/home/ttk/project/HAMi-benchmark/thesis/workloads/thesis_w
 TRAINING_ACCURACY_THRESHOLD = float(os.environ.get("TRAINING_ACCURACY_THRESHOLD", "0.5"))
 WORKLOAD_DATA_ROOT_HOST = Path(os.environ.get("WORKLOAD_DATA_ROOT_HOST", "/mnt/data/benchmark-data"))
 THESIS_TRAINING_PROTOCOL = os.environ.get("THESIS_TRAINING_PROTOCOL", "main_fixed_steps").strip().lower()
+TRAIN_FIXED_STEPS_TARGET = int(os.environ.get("WORKLOAD_TRAIN_FIXED_STEPS", "3870"))
+BACKGROUND_RUNTIME_SECONDS = int(os.environ.get("WORKLOAD_BACKGROUND_RUNTIME_SECONDS", "180"))
 
 SUMMARY_KEY_ORDER = [
     "mode",
@@ -131,7 +133,7 @@ class TaskResult:
 
 
 TASKS = [
-    TaskSpec("thesis-background-cnn-training", "background-cnn-training", 120, 3200, 96, "opportunistic", 0),
+    TaskSpec("thesis-background-cnn-training", "background-cnn-training", BACKGROUND_RUNTIME_SECONDS, 3200, 96, "opportunistic", 0),
     TaskSpec("thesis-text-embedding-inference-1", "text-embedding-inference", 25, 1000, 128, "production", 15),
     TaskSpec("thesis-vision-inference-1", "vision-inference", 45, 1800, 48, "production", 30),
     TaskSpec("thesis-text-embedding-inference-2", "text-embedding-inference", 25, 1000, 128, "production", 45),
@@ -277,7 +279,7 @@ def docker_command(task: TaskSpec) -> list[str]:
         training_env = [
             ("WORKLOAD_TRAIN_STOP_MODE", "fixed_steps"),
             ("WORKLOAD_TRAIN_FIXED_EPOCHS", os.environ.get("WORKLOAD_TRAIN_FIXED_EPOCHS", "90")),
-            ("WORKLOAD_TRAIN_FIXED_STEPS", os.environ.get("WORKLOAD_TRAIN_FIXED_STEPS", "0")),
+            ("WORKLOAD_TRAIN_FIXED_STEPS", str(TRAIN_FIXED_STEPS_TARGET)),
             ("TRAINING_ACCURACY_THRESHOLD", str(TRAINING_ACCURACY_THRESHOLD)),
         ]
 
@@ -362,6 +364,10 @@ def time_to_accuracy_threshold(epoch_metrics: list[dict], threshold: float) -> f
     return None
 
 
+def requires_fixed_steps_success(task: TaskSpec) -> bool:
+    return task.workload_kind == "background-cnn-training" and THESIS_TRAINING_PROTOCOL not in {"supplement_slope", "slope"}
+
+
 def run_benchmark() -> int:
     require_command("docker")
     require_nvidia_smi()
@@ -396,6 +402,8 @@ def run_benchmark() -> int:
         log(f"==> Workload path: {WORKLOAD_PATH}")
         log(f"==> GPU total MiB: {gpu_total_mib}")
         log(f"==> Log dir: {log_dir}")
+        log(f"==> Background fixed steps target: {TRAIN_FIXED_STEPS_TARGET}")
+        log(f"==> Background runtime seconds: {BACKGROUND_RUNTIME_SECONDS}")
 
         try:
             for task in TASKS:
@@ -420,6 +428,15 @@ def run_benchmark() -> int:
                 result_payload = extract_result_payload(process.stdout or "")
                 epoch_metrics = extract_training_epoch_metrics(process.stdout or "")
                 threshold_time = time_to_accuracy_threshold(epoch_metrics, TRAINING_ACCURACY_THRESHOLD)
+                effective_return_code = process.returncode
+                if requires_fixed_steps_success(task):
+                    fixed_steps_reached = bool((result_payload or {}).get("training_fixed_steps_reached"))
+                    if process.returncode == 0 and not fixed_steps_reached:
+                        effective_return_code = 10
+                        log(
+                            f"==> Fixed-steps target not reached for {task.name}: "
+                            f"target={TRAIN_FIXED_STEPS_TARGET} reached={fixed_steps_reached}"
+                        )
 
                 results.append(
                     TaskResult(
@@ -429,7 +446,7 @@ def run_benchmark() -> int:
                         submitted_at=format_dt(submitted_at),
                         start_at=format_dt(start_at),
                         finish_at=format_dt(finish_at),
-                        return_code=process.returncode,
+                        return_code=effective_return_code,
                         queue_delay_seconds=queue_delay,
                         runtime_seconds=runtime_seconds,
                         completion_time_seconds=completion_seconds,
@@ -440,11 +457,11 @@ def run_benchmark() -> int:
                 )
 
                 log(
-                    f"==> Finished task: {task.name} rc={process.returncode} "
+                    f"==> Finished task: {task.name} rc={effective_return_code} raw_rc={process.returncode} "
                     f"queue={queue_delay:.1f}s runtime={runtime_seconds:.1f}s completion={completion_seconds:.1f}s"
                 )
 
-                if process.returncode != 0:
+                if effective_return_code != 0:
                     raise RuntimeError(f"task failed: {task.name}")
         finally:
             stop_event.set()
@@ -528,13 +545,16 @@ def summarize(log_dir: Path, gpu_total_mib: float, results: list[TaskResult], no
     benchmark_finish = max(datetime.fromisoformat(r.finish_at) for r in results if r.finish_at)
     wall_time = (benchmark_finish - benchmark_start).total_seconds()
 
+    failed_count = len([r for r in results if r.return_code not in (0, None)])
+    completed_count = len(results) - failed_count
+
     summary = {
         "mode": "static-exclusive-host",
         "gpu_total_mib": gpu_total_mib,
         "job_count": len(results),
         "pod_count": len(results),
-        "completed_pod_count": len(results),
-        "failed_pod_count": len([r for r in results if r.return_code not in (0, None)]),
+        "completed_pod_count": completed_count,
+        "failed_pod_count": failed_count,
         "oom_count": 0,
         "total_benchmark_wall_time_seconds": wall_time,
         "max_task_completion_time_seconds": max(completion) if completion else None,
@@ -543,7 +563,7 @@ def summarize(log_dir: Path, gpu_total_mib: float, results: list[TaskResult], no
         "p99_completion_time_seconds": percentile(completion, 0.99),
         "average_runtime_seconds": statistics.mean(runtime) if runtime else None,
         "average_queue_delay_seconds": statistics.mean(queue) if queue else None,
-        "throughput_tasks_per_minute": (len(results) / wall_time * 60.0) if wall_time > 0 else None,
+        "throughput_tasks_per_minute": (completed_count / wall_time * 60.0) if wall_time > 0 else None,
         "total_processed_samples": total_processed_samples,
         "aggregate_sample_throughput_per_second": (total_processed_samples / wall_time) if wall_time > 0 else None,
         "high_priority_average_completion_time_seconds": statistics.mean(production_completion) if production_completion else None,

@@ -66,6 +66,7 @@ SUMMARY_KEY_ORDER = [
 TASK_KEY_ORDER = [
     "name",
     "phase",
+    "k8s_phase",
     "tier",
     "workload",
     "creation_timestamp",
@@ -304,6 +305,27 @@ def time_to_accuracy_threshold(epoch_metrics: list[dict], threshold: float) -> f
     return None
 
 
+def as_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y"}
+    return False
+
+
+def effective_phase(k8s_phase: str, workload: str, result_payload: dict | None) -> str:
+    if not result_payload:
+        return k8s_phase
+    if workload == "background-cnn-training":
+        stop_mode = str(result_payload.get("training_stop_mode", "")).strip().lower()
+        fixed_steps_reached = as_bool(result_payload.get("training_fixed_steps_reached", False))
+        if stop_mode == "fixed_steps" and not fixed_steps_reached:
+            return "Failed"
+    return k8s_phase
+
+
 def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_total_mib: float, log_dir: str, mode: str) -> int:
     os.makedirs(log_dir, exist_ok=True)
     pods_json = run_kubectl_json(namespace, "pods", selector)
@@ -356,7 +378,7 @@ def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_tot
         meta = item.get("metadata", {})
         status = item.get("status", {})
         labels = meta.get("labels", {}) or {}
-        phase = status.get("phase", "Unknown")
+        k8s_phase = status.get("phase", "Unknown")
         creation = parse_time(meta.get("creationTimestamp"))
         start = parse_time(status.get("startTime"))
         finished = None
@@ -374,33 +396,38 @@ def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_tot
         queue_seconds = None
         if creation and finished:
             elapsed_seconds = (finished - creation).total_seconds()
-            completed_elapsed.append(elapsed_seconds)
-            benchmark_start = creation if benchmark_start is None or creation < benchmark_start else benchmark_start
-            benchmark_finish = finished if benchmark_finish is None or finished > benchmark_finish else benchmark_finish
         if start and finished:
             runtime_seconds = (finished - start).total_seconds()
-            completed_runtime.append(runtime_seconds)
         if creation and start:
             queue_seconds = (start - creation).total_seconds()
-            queue_delay.append(queue_seconds)
 
         tier = labels.get("benchmark.hami.io/tier", "unknown")
         workload = labels.get("benchmark.hami.io/workload", "unknown")
         pod_log = run_kubectl_logs(namespace, meta.get("name", ""))
         result_payload = extract_result_payload(pod_log)
+        phase = effective_phase(k8s_phase, workload, result_payload)
         intercept_log_lines = extract_intercept_log(pod_log)
         pause_events = extract_pause_events(intercept_log_lines)
         pause_waited_ms = extract_pause_waited_ms(pause_events)
         epoch_metrics = extract_training_epoch_metrics(pod_log)
         threshold_time = time_to_accuracy_threshold(epoch_metrics, DEFAULT_TRAINING_ACCURACY_THRESHOLD)
 
-        if tier == "production" and elapsed_seconds is not None:
+        if phase == "Succeeded" and elapsed_seconds is not None:
+            completed_elapsed.append(elapsed_seconds)
+            benchmark_start = creation if benchmark_start is None or creation < benchmark_start else benchmark_start
+            benchmark_finish = finished if benchmark_finish is None or finished > benchmark_finish else benchmark_finish
+        if phase == "Succeeded" and runtime_seconds is not None:
+            completed_runtime.append(runtime_seconds)
+        if phase == "Succeeded" and queue_seconds is not None:
+            queue_delay.append(queue_seconds)
+
+        if phase == "Succeeded" and tier == "production" and elapsed_seconds is not None:
             production_completion.append(elapsed_seconds)
-        if tier == "production" and queue_seconds is not None:
+        if phase == "Succeeded" and tier == "production" and queue_seconds is not None:
             production_queue_delay.append(queue_seconds)
-        if tier == "opportunistic" and runtime_seconds is not None:
+        if phase == "Succeeded" and tier == "opportunistic" and runtime_seconds is not None:
             opportunistic_runtime.append(runtime_seconds)
-        if tier == "production" and result_payload and result_payload.get("avg_batch_latency_ms") is not None:
+        if phase == "Succeeded" and tier == "production" and result_payload and result_payload.get("avg_batch_latency_ms") is not None:
             production_batch_latency_ms.append(float(result_payload["avg_batch_latency_ms"]))
 
         if result_payload:
@@ -452,6 +479,7 @@ def summarize_runs(namespace: str, selector: str, metrics_endpoint: str, gpu_tot
                     {
                         "name": meta.get("name"),
                         "phase": phase,
+                        "k8s_phase": k8s_phase,
                         "tier": tier,
                         "workload": workload,
                         "creation_timestamp": meta.get("creationTimestamp"),

@@ -36,6 +36,7 @@ need_cmd minikube
 need_cmd python3
 need_cmd docker
 need_cmd rg
+need_cmd nvidia-smi
 
 wait_for_jobs() {
   local timeout_seconds start_time total_jobs completed_jobs failed_jobs
@@ -79,6 +80,56 @@ wait_for_jobs() {
     fi
 
     sleep 5
+  done
+}
+
+ensure_gpu_compute_mode_default() {
+  local modes
+  modes="$(nvidia-smi --query-gpu=compute_mode --format=csv,noheader 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+  if [[ -z "$modes" ]]; then
+    echo "Failed to query GPU compute mode via nvidia-smi." >&2
+    return 1
+  fi
+  if echo "$modes" | rg -qv '^Default$'; then
+    echo "Unsupported GPU compute mode detected: $(echo "$modes" | paste -sd',' -)" >&2
+    echo "HAMi thesis external benchmark requires compute mode Default for concurrent CUDA contexts." >&2
+    echo "Please run (with sudo) and retry: nvidia-smi -c 0" >&2
+    return 1
+  fi
+}
+
+extract_result_json_line() {
+  local pod_name="$1"
+  kubectl logs "$pod_name" -n "$NAMESPACE" 2>/dev/null | rg '^RESULT_JSON:' | tail -n 1 || true
+}
+
+verify_fixed_steps_completion() {
+  local pods pod_name result_line reached mode workload
+  mapfile -t pods < <(
+    kubectl get pods -n "$NAMESPACE" -l "$SELECTOR" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+      | rg '^thesis-background-cnn-training'
+  )
+
+  if [[ "${#pods[@]}" -eq 0 ]]; then
+    echo "No background training pod found for fixed-steps verification." >&2
+    return 1
+  fi
+
+  for pod_name in "${pods[@]}"; do
+    result_line="$(extract_result_json_line "$pod_name")"
+    if [[ -z "$result_line" ]]; then
+      echo "Missing RESULT_JSON in pod logs: $pod_name" >&2
+      return 1
+    fi
+
+    mode="$(python3 -c 'import json,sys; p=json.loads(sys.stdin.read().split("RESULT_JSON:",1)[1]); print(p.get("training_stop_mode",""))' <<<"$result_line" 2>/dev/null || true)"
+    workload="$(python3 -c 'import json,sys; p=json.loads(sys.stdin.read().split("RESULT_JSON:",1)[1]); print(p.get("workload_kind",""))' <<<"$result_line" 2>/dev/null || true)"
+    reached="$(python3 -c 'import json,sys; p=json.loads(sys.stdin.read().split("RESULT_JSON:",1)[1]); print(str(bool(p.get("training_fixed_steps_reached", False))).lower())' <<<"$result_line" 2>/dev/null || true)"
+
+    if [[ "$workload" == "background-cnn-training" && "$mode" == "fixed_steps" && "$reached" != "true" ]]; then
+      echo "Fixed-steps target was NOT reached for $pod_name (training_fixed_steps_reached=$reached)." >&2
+      return 1
+    fi
   done
 }
 
@@ -135,6 +186,8 @@ echo "==> Training protocol: $THESIS_TRAINING_PROTOCOL"
 echo "==> Namespace: $NAMESPACE"
 echo "==> Metrics endpoint: $METRICS_ENDPOINT"
 echo "==> Log dir: $LOG_DIR"
+echo "==> Checking GPU compute mode"
+ensure_gpu_compute_mode_default
 
 kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$NAMESPACE"
 
@@ -195,5 +248,12 @@ done
 
 echo "==> Waiting for jobs to complete"
 wait_for_jobs
+
+case "$THESIS_TRAINING_PROTOCOL" in
+  main_fixed_steps|fixed_steps)
+    echo "==> Verifying fixed-steps completion"
+    verify_fixed_steps_completion
+    ;;
+esac
 
 echo "Thesis benchmark run completed successfully."

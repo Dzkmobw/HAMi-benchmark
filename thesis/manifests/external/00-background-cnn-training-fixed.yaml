@@ -19,7 +19,7 @@ spec:
       annotations:
         external-scheduler.hami.io/enabled: "true"
         external-scheduler.hami.io/class: background
-        external-scheduler.hami.io/runtime-seconds: "120"
+        external-scheduler.hami.io/runtime-seconds: "180"
         external-scheduler.hami.io/gpu-mem-mib: "3200"
     spec:
       restartPolicy: Never
@@ -49,7 +49,7 @@ spec:
             - name: WORKLOAD_KIND
               value: background-cnn-training
             - name: WORKLOAD_RUNTIME_SECONDS
-              value: "120"
+              value: "180"
             - name: WORKLOAD_RESERVE_MIB
               value: "3200"
             - name: WORKLOAD_BATCH_SIZE
@@ -65,7 +65,7 @@ spec:
             - name: WORKLOAD_TRAIN_FIXED_EPOCHS
               value: "90"
             - name: WORKLOAD_TRAIN_FIXED_STEPS
-              value: "0"
+              value: "3870"
             - name: TRAINING_ACCURACY_THRESHOLD
               value: "0.5"
           resources:
